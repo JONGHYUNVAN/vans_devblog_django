@@ -362,15 +362,15 @@ class Command(BaseCommand):
     def _print_sync_results(self, result: Dict[str, int]):
         """동기화 결과 출력"""
         self.stdout.write("\n" + "=" * 60)
-        self.stdout.write("📊 동기화 결과:")
+        self.stdout.write("동기화 결과:")
         self.stdout.write("-" * 30)
-        self.stdout.write(f"📝 처리된 게시물: {result['processed']}개")
-        self.stdout.write(f"✅ 동기화 성공: {result['synced']}개")
-        self.stdout.write(f"⏭️  건너뜀: {result['skipped']}개")
-        self.stdout.write(f"❌ 오류: {result['errors']}개")
+        self.stdout.write(f"처리된 게시물: {result['processed']}개")
+        self.stdout.write(f"동기화 성공: {result['synced']}개")
+        self.stdout.write(f"건너뜀: {result['skipped']}개")
+        self.stdout.write(f"오류: {result['errors']}개")
         
         if result['processed'] > 0:
             success_rate = (result['synced'] / result['processed']) * 100
-            self.stdout.write(f"🎯 성공률: {success_rate:.1f}%")
+            self.stdout.write(f"성공률: {success_rate:.1f}%")
         
         self.stdout.write("=" * 60)

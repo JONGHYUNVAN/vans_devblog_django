@@ -1,39 +1,39 @@
 # VansDevBlog Django-Elasticsearch 검색 서비스 구현 계획
 
-## 📋 프로젝트 개요
+## 프로젝트 개요
 
 VansDevBlog의 마이크로서비스 아키텍처에 Django-Elasticsearch 기반 검색 서비스를 추가하여 사용자에게 강력하고 직관적인 검색 기능을 제공합니다.
 
-### 🎯 프로젝트 목표
+### 프로젝트 목표
 - 기존 마이크로서비스 아키텍처와 원활한 통합
 - 비용 효율적인 검색 서비스 구축
 - 한국어/영어 다국어 검색 지원
 - 실시간 검색 및 자동완성 기능 제공
 
-## 🏗️ 아키텍처 설계
+## 아키텍처 설계
 
 ### 현재 VansDevBlog 아키텍처
 ```
-🖥️ Frontend (Next.js)
-├── 👤 User Service (Spring Boot + MariaDB)
-├── 📝 Post Service (NestJS + MongoDB)
-├── 🔐 OAuth Service (Next.js)
-├── 🖼️ Image Service (Next.js + AWS S3)
-└── 🤖 AI Chat Service (Next.js + OpenAI)
+Frontend (Next.js)
+├── User Service (Spring Boot + MariaDB)
+├── Post Service (NestJS + MongoDB)
+├── OAuth Service (Next.js)
+├── Image Service (Next.js + AWS S3)
+└── AI Chat Service (Next.js + OpenAI)
 ```
 
 ### 추가될 검색 서비스 아키텍처
 ```
-📦 Search Service (Django-Elasticsearch)
-├── 🔍 Elasticsearch (단일 노드, 최소 구성)
-├── 🐍 Django REST API
-├── 🗄️ 기존 DB 활용:
+Search Service (Django-Elasticsearch)
+├── Elasticsearch (단일 노드, 최소 구성)
+├── Django REST API
+├── 기존 DB 활용:
 │   ├── MariaDB (User Service) - 검색 로그, 사용자 검색 기록
 │   └── MongoDB (Post Service) - 메인 데이터 소스, 검색 분석 데이터
-└── 💾 Django 내장 캐싱 (메모리 기반)
+└── Django 내장 캐싱 (메모리 기반)
 ```
 
-## 🛠️ 기술 스택
+## 기술 스택
 
 ### 핵심 기술
 - **Backend**: Django 4.2+ + Django REST Framework
@@ -60,7 +60,7 @@ VansDevBlog의 마이크로서비스 아키텍처에 Django-Elasticsearch 기반
 - 커스텀 성능 모니터링
 - **Cerebro**: Elasticsearch GUI 관리 도구 (무료)
 
-## 💰 비용 최적화 전략
+## 비용 최적화 전략
 
 ### 기존 인프라 최대 활용
 - **MariaDB/MongoDB**: 기존 DB 활용으로 추가 비용 없음
@@ -74,7 +74,7 @@ VansDevBlog의 마이크로서비스 아키텍처에 Django-Elasticsearch 기반
 절감 효과: 월 $55-95 (약 85% 절감)
 ```
 
-## 🔍 구현할 검색 기능
+## 구현할 검색 기능
 
 ### 1. 핵심 검색 기능
 - **통합 검색**: 모든 게시물, 카테고리, 태그 통합 검색
@@ -93,7 +93,7 @@ VansDevBlog의 마이크로서비스 아키텍처에 Django-Elasticsearch 기반
 - **기본 성능 모니터링**: 응답 시간, 검색 결과 수
 - **사용자 검색 패턴**: 개인별 검색 히스토리
 
-## 📊 데이터베이스 스키마 설계
+## 데이터베이스 스키마 설계
 
 ### MariaDB 확장 (User Service DB)
 
@@ -179,7 +179,7 @@ db.search_analytics.createIndex({ "query": 1, "date": -1 });
 db.search_suggestions.createIndex({ "prefix": 1, "score": -1 });
 ```
 
-## ⚡ 성능 최적화 구성
+## 성능 최적화 구성
 
 ### Django 캐싱 설정
 ```python
@@ -301,7 +301,7 @@ networks:
 }
 ```
 
-## 📋 단계별 구현 계획
+## 단계별 구현 계획
 
 ### Phase 1: 기본 인프라 구축 (1주)
 
@@ -405,7 +405,7 @@ networks:
 - [ ] 에러 처리 및 알림
 - [ ] 성능 모니터링 설정
 
-## 📝 코드 컨벤션 및 문서화 가이드라인
+## 코드 컨벤션 및 문서화 가이드라인
 
 ### 코딩 스타일
 - **PEP 8**: Python 코드 스타일 가이드 준수
@@ -587,7 +587,7 @@ class SearchViewSet(viewsets.ViewSet):
         pass
 ```
 
-## 🔧 주요 구현 고려사항
+## 주요 구현 고려사항
 
 ### 1. 마이크로서비스 통신
 - **API Gateway**: 검색 요청 라우팅 및 인증
@@ -609,7 +609,7 @@ class SearchViewSet(viewsets.ViewSet):
 - **Elasticsearch 클러스터**: 향후 멀티 노드 구성
 - **캐시 계층**: Redis 도입 시점 및 전략
 
-## 📊 성공 지표
+## 성공 지표
 
 ### 기술적 성과
 - **응답 시간**: 평균 200ms 이하 검색 응답
@@ -627,14 +627,14 @@ class SearchViewSet(viewsets.ViewSet):
 - **사용자 체류 시간**: 평균 20% 증가
 - **컨텐츠 발견율**: 검색을 통한 과거 게시물 조회 30% 증가
 
-## 🚀 다음 단계
+## 다음 단계
 
 1. **Phase 1 시작**: Django 프로젝트 초기화 및 Elasticsearch 환경 구성
 2. **MVP 개발**: 기본 검색 기능부터 단계별 구현
 3. **점진적 확장**: 사용량 증가에 따른 기능 확장
 4. **성능 모니터링**: 각 단계별 성능 측정 및 최적화
 
-## 📦 주요 의존성 패키지
+## 주요 의존성 패키지
 
 ### requirements.txt
 ```txt
@@ -685,7 +685,7 @@ isort --profile=black .
 flake8 --max-line-length=88 --extend-ignore=E203,W503 .
 ```
 
-## 📚 참고 자료
+## 참고 자료
 
 - [Django-Elasticsearch-DSL 공식 문서](https://django-elasticsearch-dsl.readthedocs.io/)
 - [Elasticsearch 한국어 분석기 가이드](https://www.elastic.co/guide/en/elasticsearch/plugins/current/analysis-nori.html)

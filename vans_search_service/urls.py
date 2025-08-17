@@ -24,11 +24,40 @@ from drf_yasg import openapi
 schema_view = get_schema_view(
     openapi.Info(
         title="VansDevBlog Search Service API",
-        default_version='v1',
-        description="Django-Elasticsearch 기반 검색 서비스 API",
+        default_version='v1.0.0',
+        description="""
+        VansDevBlog Django-Elasticsearch 검색 서비스 API
+        
+        ## 주요 기능
+        - **고성능 검색**: Elasticsearch + Nori 한국어 분석기
+        - **계층적 필터링**: Theme → Category → Tags
+        - **다국어 지원**: 한국어/영어 동시 검색
+        - **실시간 자동완성**: 검색어 제안
+        - **인기 검색어**: 통계 기반 추천
+        
+        ## 필터 계층구조
+        ```
+        Theme (상위) → Category (하위) → Tags (세부)
+        ├── algorithm → introduction → [Java, Algorithm]
+        ├── web → frontend/backend → [React, Django] 
+        └── database → nosql/sql → [MongoDB, MySQL]
+        ```
+        
+        ## 사용 예시
+        - 기본 검색: `/posts/?query=Django`
+        - 테마 필터: `/posts/?theme=algorithm&query=정렬`
+        - 복합 필터: `/posts/?theme=web&category=frontend&tags=React`
+        """,
         terms_of_service="https://vansdevblog.online/terms/",
-        contact=openapi.Contact(email="contact@vansdevblog.online"),
-        license=openapi.License(name="MIT License"),
+        contact=openapi.Contact(
+            name="VansDevBlog Support",
+            email="contact@vansdevblog.online",
+            url="https://vansdevblog.online"
+        ),
+        license=openapi.License(
+            name="MIT License",
+            url="https://opensource.org/licenses/MIT"
+        ),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),

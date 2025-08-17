@@ -64,8 +64,13 @@ def health_check(request):
         {"status": "healthy", "service": "VansDevBlog Search Service", ...}
     """
     try:
-        # TODO: Elasticsearch 연결 상태 확인
-        elasticsearch_connected = True
+        # Elasticsearch 연결 상태 확인
+        try:
+            from search.utils.elasticsearch_client import ElasticsearchClient
+            es_client = ElasticsearchClient()
+            elasticsearch_connected = es_client.check_connection()
+        except Exception:
+            elasticsearch_connected = False
         
         logger.info("Health check requested - Service is healthy")
         
@@ -89,7 +94,7 @@ def health_check(request):
 @swagger_auto_schema(
     method='get',
     operation_summary="게시물 검색",
-    operation_description="키워드, 카테고리, 태그 등을 기반으로 게시물을 검색합니다.",
+    operation_description="키워드, 테마, 카테고리, 태그 등을 기반으로 게시물을 검색합니다. theme는 카테고리의 상위 개념입니다.",
     query_serializer=SearchRequestSerializer,
     responses={
         200: SearchResponseSerializer,
@@ -101,31 +106,45 @@ def health_check(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def search_posts(request):
-    """
-    게시물을 검색하는 API 엔드포인트입니다.
+    """게시물을 검색하는 API 엔드포인트입니다.
     
     이 API는 Elasticsearch를 사용하여 게시물을 검색하며,
     키워드, 카테고리, 태그, 날짜 등 다양한 필터를 지원합니다.
     
-    Query Parameters:
-        query (str): 검색할 키워드
-        category (str): 카테고리 필터
-        tags (str): 태그 필터 (쉼표로 구분)
-        language (str): 언어 필터 (ko, en, all)
-        date_from (datetime): 검색 시작 날짜
-        date_to (datetime): 검색 종료 날짜
-        page (int): 페이지 번호 (기본값: 1)
-        page_size (int): 페이지 크기 (기본값: 20)
-        sort (str): 정렬 방식 (relevance, date_desc, date_asc, views_desc, likes_desc)
-        
+    Args:
+        request: HTTP 요청 객체
+        query (str, optional): 검색할 키워드
+        theme (str, optional): 테마 필터. 카테고리 상위 개념 
+            (예: algorithm, web, database)
+        category (str, optional): 카테고리 필터. 구체적인 분야 
+            (예: introduction, frontend, backend)
+        tags (str, optional): 태그 필터. 쉼표로 구분된 태그들 
+            (예: Java,Python,Django)
+        language (str, optional): 언어 필터. 지원 언어: ko, en, all 
+            (기본값: all)
+        date_from (datetime, optional): 검색 시작 날짜
+        date_to (datetime, optional): 검색 종료 날짜
+        page (int, optional): 페이지 번호 (기본값: 1)
+        page_size (int, optional): 페이지 크기 (기본값: 20, 최대: 100)
+        sort (str, optional): 정렬 방식. 옵션: relevance, date_desc, 
+            date_asc, views_desc, likes_desc
+    
     Returns:
-        Response: 검색 결과
+        Response: 검색 결과를 포함한 JSON 응답
             - total (int): 전체 결과 수
             - page (int): 현재 페이지
             - page_size (int): 페이지 크기
             - total_pages (int): 전체 페이지 수
             - results (List[Dict]): 검색 결과 목록
             - aggregations (Dict): 집계 정보
+            
+    Note:
+        필터 계층 구조:
+        Theme (상위) → Category (하위) → Tags (세부)
+        
+        * algorithm → introduction → [Java, Algorithm, HashMap]
+        * web → frontend/backend → [React, Django, API]  
+        * database → nosql/sql → [MongoDB, MySQL, Query]
             
     Example:
         >>> GET /api/v1/search/posts/?query=Django&category=Backend&page=1
@@ -268,18 +287,19 @@ def search_posts(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def autocomplete(request):
-    """
-    검색어 자동완성 제안을 제공하는 API 엔드포인트입니다.
+    """검색어 자동완성 제안을 제공하는 API 엔드포인트입니다.
     
     사용자가 검색어를 입력하는 동안 실시간으로 관련 제안을 제공합니다.
     
-    Query Parameters:
-        query (str): 자동완성할 검색어 (1글자 이상)
-        language (str): 언어 필터 (ko, en, all) - 기본값: all
-        limit (int): 반환할 제안 수 (1-20) - 기본값: 10
+    Args:
+        request: HTTP 요청 객체
+        query (str): 자동완성할 검색어. 최소 1글자 이상 입력 필요
+        language (str, optional): 언어 필터. 지원 언어: ko, en, all 
+            (기본값: all)
+        limit (int, optional): 반환할 제안 수. 범위: 1-20 (기본값: 10)
         
     Returns:
-        Response: 자동완성 제안 목록
+        Response: 자동완성 제안을 포함한 JSON 응답
             - suggestions (List[str]): 제안 목록
             - query (str): 원본 검색어
             
