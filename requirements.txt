@@ -1,0 +1,30 @@
+# Django 기본
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+
+# Elasticsearch 연동
+django-elasticsearch-dsl==7.3.0
+elasticsearch==8.11.0
+
+# API 문서화
+drf-yasg==1.21.7
+
+# 데이터베이스
+PyMySQL==1.1.0      # MariaDB 연결 (Pure Python)
+pymongo==4.5.0      # MongoDB 연결
+
+# 코드 품질 및 문서화
+black==23.10.1
+flake8==6.1.0
+isort==5.12.0
+mypy==1.7.0
+
+# 개발 도구
+python-dotenv==1.0.0
+pydantic==2.1.1
+
+# 테스트
+pytest==7.4.3
+pytest-django==4.7.0
+pytest-cov==4.1.0
