@@ -18,9 +18,12 @@ urlpatterns = [
     # DRF Router URLs
     path('', include(router.urls)),
     
-    # 직접 정의된 URL 패턴들
+    # 서비스 상태 확인
     path('health/', views.health_check, name='health-check'),
-    # path('posts/', views.PostSearchView.as_view(), name='post-search'),
-    # path('autocomplete/', views.AutocompleteView.as_view(), name='autocomplete'),
-    # path('popular/', views.PopularSearchesView.as_view(), name='popular-searches'),
+    
+    # 검색 API
+    path('posts/', views.search_posts, name='search-posts'),
+    path('autocomplete/', views.autocomplete, name='autocomplete'),
+    path('popular/', views.popular_searches, name='popular-searches'),
+    path('categories/', views.get_categories, name='get-categories'),
 ]

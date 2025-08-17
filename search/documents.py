@@ -5,72 +5,74 @@ Elasticsearch 문서 스키마와 인덱스 매핑을 정의합니다.
 한국어/영어 다국어 검색을 위한 Nori 분석기를 포함합니다.
 """
 
-from django_elasticsearch_dsl import Document, Index, fields
-from django_elasticsearch_dsl.registries import registry
+from elasticsearch_dsl import Document, Text, Keyword, Integer, Boolean, Date, Float, Object, Completion
+from elasticsearch_dsl import analyzer, tokenizer, Index
+from elasticsearch_dsl.connections import connections
 from typing import Dict, Any, List, Optional
+from django.conf import settings
 import logging
 
 logger = logging.getLogger('search')
 
 # =============================================================================
-# Elasticsearch 인덱스 설정
+# Elasticsearch 연결 설정
 # =============================================================================
 
-# 게시물 인덱스 설정
-posts_index = Index('vans_posts')
-posts_index.settings(
-    number_of_shards=1,
-    number_of_replicas=0,  # 개발 환경에서는 복제본 없음
-    max_result_window=10000,  # 최대 검색 결과 수
-    # 한국어 분석기 설정
-    analysis={
-        'analyzer': {
-            'korean_analyzer': {
-                'type': 'custom',
-                'tokenizer': 'nori_tokenizer',
-                'filter': [
-                    'lowercase',
-                    'nori_part_of_speech',
-                    'nori_readingform',
-                    'stop'
-                ]
-            },
-            'english_analyzer': {
-                'type': 'custom',
-                'tokenizer': 'standard',
-                'filter': [
-                    'lowercase',
-                    'stop',
-                    'snowball'
-                ]
-            },
-            'search_analyzer': {
-                'type': 'custom',
-                'tokenizer': 'keyword',
-                'filter': ['lowercase']
-            }
-        },
-        'tokenizer': {
-            'nori_tokenizer': {
-                'type': 'nori_tokenizer',
-                'decompound_mode': 'mixed'
-            }
-        },
-        'filter': {
-            'nori_part_of_speech': {
-                'type': 'nori_part_of_speech',
-                'stoptags': ['E', 'IC', 'J', 'MAG', 'MAJ', 'MM', 'SP', 'SSC', 'SSO', 'SC', 'SE', 'XPN', 'XSA', 'XSN', 'XSV', 'UNA', 'NA', 'VSV']
-            },
-            'stop': {
-                'type': 'stop',
-                'stopwords': ['_korean_', '_english_']
-            }
-        }
-    }
+def setup_elasticsearch_connection():
+    """Elasticsearch 연결을 설정합니다."""
+    try:
+        connections.create_connection(
+            hosts=settings.ELASTICSEARCH_DSL['default']['hosts'],
+            timeout=settings.ELASTICSEARCH_DSL['default'].get('timeout', 20),
+            max_retries=settings.ELASTICSEARCH_DSL['default'].get('max_retries', 3),
+            retry_on_timeout=settings.ELASTICSEARCH_DSL['default'].get('retry_on_timeout', True)
+        )
+        logger.info("Elasticsearch connection established")
+    except Exception as e:
+        logger.error(f"Failed to establish Elasticsearch connection: {str(e)}")
+        raise
+
+# 연결 초기화
+setup_elasticsearch_connection()
+
+# =============================================================================
+# 분석기 정의
+# =============================================================================
+
+# 한국어 분석기 (Nori 토크나이저 사용)
+korean_analyzer = analyzer(
+    'korean_analyzer',
+    tokenizer='nori_tokenizer',
+    filter=[
+        'lowercase',
+        'nori_part_of_speech',
+        'nori_readingform',
+        'stop'
+    ]
 )
 
+# 영어 분석기
+english_analyzer = analyzer(
+    'english_analyzer',
+    tokenizer='standard',
+    filter=[
+        'lowercase',
+        'stop',
+        'snowball'
+    ]
+)
 
-@registry.register_document
+# 검색용 분석기
+search_analyzer = analyzer(
+    'search_analyzer',
+    tokenizer='keyword',
+    filter=['lowercase']
+)
+
+# =============================================================================
+# 게시물 Document 클래스
+# =============================================================================
+
 class PostDocument(Document):
     """
     블로그 게시물 Elasticsearch 문서 클래스.
@@ -114,144 +116,150 @@ class PostDocument(Document):
     """
     
     # 기본 식별자
-    post_id = fields.KeywordField(
-        attr='post_id',
-        help_text="MongoDB ObjectId 문자열"
-    )
+    post_id = Keyword()
     
     # 제목 - 다국어 분석
-    title = fields.TextField(
-        analyzer='korean_analyzer',
-        search_analyzer='korean_analyzer',
+    title = Text(
+        analyzer=korean_analyzer,
         fields={
-            'english': fields.TextField(
-                analyzer='english_analyzer',
-                search_analyzer='english_analyzer'
-            ),
-            'raw': fields.KeywordField(),  # 정확한 매칭용
-            'suggest': fields.CompletionField()  # 자동완성용
-        },
-        help_text="게시물 제목 (한국어/영어 분석 지원)"
+            'english': Text(analyzer=english_analyzer),
+            'raw': Keyword(),
+            'suggest': Completion()
+        }
     )
     
     # 내용 - 다국어 분석
-    content = fields.TextField(
-        analyzer='korean_analyzer',
-        search_analyzer='korean_analyzer',
+    content = Text(
+        analyzer=korean_analyzer,
         fields={
-            'english': fields.TextField(
-                analyzer='english_analyzer',
-                search_analyzer='english_analyzer'
-            )
-        },
-        help_text="게시물 본문 내용"
+            'english': Text(analyzer=english_analyzer)
+        }
     )
     
     # 요약
-    summary = fields.TextField(
-        analyzer='korean_analyzer',
-        search_analyzer='korean_analyzer',
+    summary = Text(
+        analyzer=korean_analyzer,
         fields={
-            'english': fields.TextField(
-                analyzer='english_analyzer'
-            )
-        },
-        help_text="게시물 요약"
+            'english': Text(analyzer=english_analyzer)
+        }
     )
     
     # URL 슬러그
-    slug = fields.KeywordField(
-        help_text="URL 슬러그"
-    )
+    slug = Keyword()
     
     # 카테고리 - 키워드 검색
-    category = fields.KeywordField(
+    category = Keyword(
         fields={
-            'text': fields.TextField(analyzer='keyword')
-        },
-        help_text="게시물 카테고리"
+            'text': Text(analyzer='keyword')
+        }
     )
     
     # 태그 - 배열 키워드
-    tags = fields.KeywordField(
+    tags = Keyword(
         multi=True,
         fields={
-            'suggest': fields.CompletionField()  # 태그 자동완성
-        },
-        help_text="게시물 태그 목록"
+            'suggest': Completion()
+        }
     )
     
     # 작성자 정보
-    author = fields.ObjectField(
+    author = Object(
         properties={
-            'user_id': fields.KeywordField(),
-            'username': fields.KeywordField(),
-            'display_name': fields.TextField(analyzer='keyword'),
-            'profile_image': fields.KeywordField()
-        },
-        help_text="작성자 정보"
+            'user_id': Keyword(),
+            'username': Keyword(),
+            'display_name': Text(analyzer='keyword'),
+            'profile_image': Keyword()
+        }
     )
     
     # 날짜 필드
-    published_date = fields.DateField(
-        help_text="게시물 발행일"
-    )
-    
-    updated_date = fields.DateField(
-        help_text="게시물 수정일"
-    )
+    published_date = Date()
+    updated_date = Date()
     
     # 통계 필드
-    view_count = fields.IntegerField(
-        help_text="조회수"
-    )
-    
-    like_count = fields.IntegerField(
-        help_text="좋아요 수"
-    )
-    
-    comment_count = fields.IntegerField(
-        help_text="댓글 수"
-    )
+    view_count = Integer()
+    like_count = Integer()
+    comment_count = Integer()
     
     # 상태 필드
-    is_published = fields.BooleanField(
-        help_text="발행 여부"
-    )
+    is_published = Boolean()
     
     # 언어 코드
-    language = fields.KeywordField(
-        help_text="언어 코드 (ko, en)"
-    )
+    language = Keyword()
     
     # 기타 메타데이터
-    reading_time = fields.IntegerField(
-        help_text="예상 읽기 시간 (분)"
-    )
-    
-    featured_image = fields.KeywordField(
-        help_text="대표 이미지 URL"
-    )
-    
-    meta_description = fields.TextField(
-        analyzer='korean_analyzer',
-        help_text="SEO 메타 설명"
-    )
-    
-    # 검색 점수 부스팅용 필드
-    search_boost = fields.FloatField(
-        help_text="검색 결과 부스팅 점수"
-    )
+    reading_time = Integer()
+    featured_image = Keyword()
+    meta_description = Text(analyzer=korean_analyzer)
+    search_boost = Float()
     
     class Index:
         """Elasticsearch 인덱스 설정"""
         name = 'vans_posts'
-        settings = posts_index._settings
-    
-    class Django:
-        """Django 모델 연결 설정 (현재는 MongoDB 사용하므로 비활성화)"""
-        # model = Post  # Django ORM 모델이 있다면 연결
-        pass
+        settings = {
+            'number_of_shards': 1,
+            'number_of_replicas': 0,
+            'max_result_window': 10000,
+                            'analysis': {
+                    'analyzer': {
+                        'korean_analyzer': {
+                            'type': 'custom',
+                            'tokenizer': 'nori_tokenizer',
+                            'filter': [
+                                'lowercase',
+                                'nori_part_of_speech',
+                                'nori_readingform',
+                                'stop'
+                            ]
+                        },
+                        'english_analyzer': {
+                            'type': 'custom',
+                            'tokenizer': 'standard',
+                            'filter': [
+                                'lowercase',
+                                'stop',
+                                'snowball'
+                            ]
+                        },
+                        'search_analyzer': {
+                            'type': 'custom',
+                            'tokenizer': 'keyword',
+                            'filter': ['lowercase']
+                        }
+                    },
+                    'tokenizer': {
+                        'nori_tokenizer': {
+                            'type': 'nori_tokenizer',
+                            'decompound_mode': 'mixed',
+                            'user_dictionary_rules': [
+                                'Django',
+                                'Elasticsearch',
+                                'REST API',
+                                'Spring Boot',
+                                'React',
+                                'Vue.js'
+                            ]
+                        }
+                    },
+                    'filter': {
+                        'nori_part_of_speech': {
+                            'type': 'nori_part_of_speech',
+                            'stoptags': [
+                                'E', 'IC', 'J', 'MAG', 'MAJ', 'MM', 
+                                'SP', 'SSC', 'SSO', 'SC', 'SE', 
+                                'XPN', 'XSA', 'XSN', 'XSV', 'UNA', 'NA', 'VSV'
+                            ]
+                        },
+                        'nori_readingform': {
+                            'type': 'nori_readingform'
+                        },
+                        'stop': {
+                            'type': 'stop',
+                            'stopwords': ['_korean_', '_english_']
+                        }
+                    }
+                }
+        }
     
     def save(self, **kwargs) -> 'PostDocument':
         """
@@ -346,29 +354,12 @@ class PostDocument(Document):
         except Exception as e:
             logger.error(f"Failed to create PostDocument from mongo data: {str(e)}")
             raise ValueError(f"Invalid MongoDB post data: {str(e)}")
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """
-        문서를 딕셔너리로 변환합니다.
-        
-        Returns:
-            Dict[str, Any]: 문서 데이터 딕셔너리
-        """
-        return self.to_dict()
 
 
 # =============================================================================
 # 자동완성용 Suggestion Document
 # =============================================================================
 
-suggestions_index = Index('vans_suggestions')
-suggestions_index.settings(
-    number_of_shards=1,
-    number_of_replicas=0
-)
-
-
-@registry.register_document
 class SuggestionDocument(Document):
     """
     검색 자동완성을 위한 제안 문서 클래스.
@@ -391,7 +382,7 @@ class SuggestionDocument(Document):
         >>> suggestion.save()
     """
     
-    suggestion = fields.CompletionField(
+    suggestion = Completion(
         contexts=[
             {
                 'name': 'type',
@@ -404,18 +395,95 @@ class SuggestionDocument(Document):
         ]
     )
     
-    type = fields.KeywordField(
-        help_text="제안 타입: query, category, tag, title"
-    )
-    
-    frequency = fields.IntegerField(
-        help_text="사용 빈도"
-    )
-    
-    language = fields.KeywordField(
-        help_text="언어 코드"
-    )
+    type = Keyword()
+    frequency = Integer()
+    language = Keyword()
     
     class Index:
         name = 'vans_suggestions'
-        settings = suggestions_index._settings
+        settings = {
+            'number_of_shards': 1,
+            'number_of_replicas': 0
+        }
+
+
+# =============================================================================
+# 인덱스 초기화 함수
+# =============================================================================
+
+def create_indexes():
+    """
+    Elasticsearch 인덱스를 생성합니다.
+    
+    Example:
+        >>> create_indexes()
+        INFO: Created index: vans_posts
+        INFO: Created index: vans_suggestions
+    """
+    try:
+        # PostDocument 인덱스 생성
+        post_index = PostDocument._index
+        if not post_index.exists():
+            post_index.create()
+            logger.info("Created index: vans_posts")
+        else:
+            logger.info("Index already exists: vans_posts")
+        
+        # SuggestionDocument 인덱스 생성
+        suggestion_index = SuggestionDocument._index
+        if not suggestion_index.exists():
+            suggestion_index.create()
+            logger.info("Created index: vans_suggestions")
+        else:
+            logger.info("Index already exists: vans_suggestions")
+            
+    except Exception as e:
+        logger.error(f"Failed to create indexes: {str(e)}")
+        raise
+
+
+def delete_indexes():
+    """
+    Elasticsearch 인덱스를 삭제합니다.
+    
+    Example:
+        >>> delete_indexes()
+        INFO: Deleted index: vans_posts
+        INFO: Deleted index: vans_suggestions
+    """
+    try:
+        # PostDocument 인덱스 삭제
+        post_index = PostDocument._index
+        if post_index.exists():
+            post_index.delete()
+            logger.info("Deleted index: vans_posts")
+        
+        # SuggestionDocument 인덱스 삭제
+        suggestion_index = SuggestionDocument._index
+        if suggestion_index.exists():
+            suggestion_index.delete()
+            logger.info("Deleted index: vans_suggestions")
+            
+    except Exception as e:
+        logger.error(f"Failed to delete indexes: {str(e)}")
+        raise
+
+
+def rebuild_indexes():
+    """
+    Elasticsearch 인덱스를 재구축합니다.
+    
+    Example:
+        >>> rebuild_indexes()
+        INFO: Deleted index: vans_posts
+        INFO: Created index: vans_posts
+        INFO: Deleted index: vans_suggestions
+        INFO: Created index: vans_suggestions
+    """
+    try:
+        delete_indexes()
+        create_indexes()
+        logger.info("Rebuilt all indexes successfully")
+    except Exception as e:
+        logger.error(f"Failed to rebuild indexes: {str(e)}")
+        raise

@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Optional, Union
 from django.conf import settings
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConnectionError, RequestError, NotFoundError
-from django_elasticsearch_dsl import get_connection
+from elasticsearch_dsl.connections import connections
 import logging
 
 logger = logging.getLogger('search')
@@ -45,7 +45,7 @@ class ElasticsearchClient:
             ConnectionError: Elasticsearch 서버에 연결할 수 없는 경우
         """
         try:
-            self.client = get_connection()
+            self.client = connections.get_connection()
             logger.info("Elasticsearch client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Elasticsearch client: {str(e)}")

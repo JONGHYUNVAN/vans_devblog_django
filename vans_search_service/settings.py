@@ -215,7 +215,7 @@ SWAGGER_SETTINGS = {
 
 ELASTICSEARCH_DSL = {
     'default': {
-        'hosts': os.getenv('ELASTICSEARCH_HOST', 'localhost:9200'),
+        'hosts': [f"http://{os.getenv('ELASTICSEARCH_HOST', 'localhost:9200')}"],
         'timeout': 20,
         'max_retries': 3,
         'retry_on_timeout': True,
