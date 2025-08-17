@@ -215,9 +215,14 @@ class ElasticsearchClient:
                 search_query = {"match_all": {}}
             
             # 필터 조건 구성
-            filter_conditions = [{"term": {"is_published": True}}]
+            filter_conditions = []
             
             if filters:
+                if filters.get('theme'):
+                    filter_conditions.append({
+                        "term": {"theme": filters['theme']}
+                    })
+                
                 if filters.get('category'):
                     filter_conditions.append({
                         "term": {"category": filters['category']}
@@ -286,15 +291,13 @@ class ElasticsearchClient:
                 body=body
             )
             
-            # 결과 포맷팅
+            # 결과 포맷팅 (ID와 점수만 반환)
             result = {
                 "total": response["hits"]["total"]["value"],
                 "hits": [
                     {
-                        "id": hit["_id"],
-                        "score": hit["_score"],
-                        "source": hit["_source"],
-                        "highlight": hit.get("highlight", {})
+                        "post_id": hit["_source"]["post_id"],  # MongoDB ObjectId
+                        "score": hit["_score"]
                     }
                     for hit in response["hits"]["hits"]
                 ],

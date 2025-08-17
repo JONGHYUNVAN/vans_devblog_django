@@ -169,6 +169,7 @@ def search_posts(request):
         
         # 검색 파라미터 추출
         query = validated_data.get('query', '')
+        theme = validated_data.get('theme', '')
         category = validated_data.get('category', '')
         tags = validated_data.get('tags', [])
         language = validated_data.get('language', 'all')
@@ -181,6 +182,7 @@ def search_posts(request):
         # 캐시 확인
         cache_manager = CacheManager()
         filters = {
+            'theme': theme,
             'category': category,
             'tags': tags,
             'language': language if language != 'all' else None,
@@ -232,7 +234,8 @@ def search_posts(request):
             'page': page,
             'page_size': page_size,
             'total_pages': total_pages,
-            'results': search_result['hits'],
+            'post_ids': [hit['post_id'] for hit in search_result['hits']],
+            'results': search_result['hits'],  # post_id, score만
             'aggregations': search_result.get('aggregations', {})
         }
         

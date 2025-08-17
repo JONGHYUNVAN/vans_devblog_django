@@ -147,6 +147,13 @@ class PostDocument(Document):
     # URL 슬러그
     slug = Keyword()
     
+    # 테마 - 키워드 검색 (카테고리 상위 개념)
+    theme = Keyword(
+        fields={
+            'text': Text(analyzer='keyword')
+        }
+    )
+    
     # 카테고리 - 키워드 검색
     category = Keyword(
         fields={

@@ -55,6 +55,8 @@ class MongoDBClient:
                     f"{mongodb_settings['password']}@"
                     f"{mongodb_settings['host']}:{mongodb_settings['port']}/"
                     f"{mongodb_settings['database']}"
+                    f"?authSource={mongodb_settings.get('auth_source', 'admin')}"
+                    f"&directConnection={str(mongodb_settings.get('direct_connection', True)).lower()}"
                 )
             else:
                 connection_url = (
@@ -64,7 +66,9 @@ class MongoDBClient:
             
             self.client = MongoClient(
                 connection_url,
-                serverSelectionTimeoutMS=5000  # 5초 타임아웃
+                serverSelectionTimeoutMS=10000,  # 10초 타임아웃 (클라우드 연결용)
+                connectTimeoutMS=10000,
+                socketTimeoutMS=20000
             )
             
             # 데이터베이스 및 컬렉션 설정
@@ -153,6 +157,35 @@ class MongoDBClient:
                 
         except Exception as e:
             logger.error(f"Failed to get published posts: {str(e)}")
+            return
+    
+    def get_all_posts(
+        self,
+        batch_size: int = 100,
+        skip: int = 0
+    ) -> Iterator[Dict[str, Any]]:
+        """
+        모든 게시물을 배치 단위로 반환합니다 (발행 여부 무관).
+        
+        Args:
+            batch_size (int): 배치 크기 (기본값: 100)
+            skip (int): 건너뛸 문서 수 (기본값: 0)
+            
+        Yields:
+            Dict[str, Any]: 게시물 문서
+            
+        Example:
+            >>> for post in mongo_client.get_all_posts():
+            ...     print(f"Post: {post['title']} - Published: {post.get('is_published', False)}")
+        """
+        try:
+            cursor = self.posts_collection.find({}).skip(skip).limit(batch_size)
+            
+            for post in cursor:
+                yield self._format_post_document(post)
+                
+        except Exception as e:
+            logger.error(f"Failed to get all posts: {str(e)}")
             return
     
     def get_posts_by_ids(self, post_ids: List[str]) -> List[Dict[str, Any]]:

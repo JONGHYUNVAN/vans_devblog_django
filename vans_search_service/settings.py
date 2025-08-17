@@ -258,6 +258,20 @@ MONGODB_SETTINGS = {
 
 
 # =============================================================================
+# MONGODB SETTINGS
+# =============================================================================
+
+MONGODB_SETTINGS = {
+    'host': os.getenv('MONGODB_HOST', 'localhost'),
+    'port': int(os.getenv('MONGODB_PORT', 27017)),
+    'database': os.getenv('MONGODB_DATABASE', 'devblog'),
+    'username': os.getenv('MONGODB_USERNAME'),
+    'password': os.getenv('MONGODB_PASSWORD'),
+    'auth_source': os.getenv('MONGODB_AUTH_SOURCE', 'admin'),
+    'direct_connection': os.getenv('MONGODB_DIRECT_CONNECTION', 'true').lower() == 'true'
+}
+
+# =============================================================================
 # LOGGING SETTINGS
 # =============================================================================
 

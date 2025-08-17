@@ -234,6 +234,12 @@ class SearchRequestSerializer(serializers.Serializer):
         allow_blank=True,
         help_text="검색 키워드"
     )
+    theme = serializers.CharField(
+        max_length=100,
+        required=False,
+        allow_blank=True,
+        help_text="테마 필터 (카테고리 상위 개념)"
+    )
     category = serializers.CharField(
         max_length=100,
         required=False,
@@ -343,13 +349,8 @@ class SearchResultSerializer(serializers.Serializer):
         >>> serializer = SearchResultSerializer(result)
     """
     
-    id = serializers.CharField(help_text="문서 ID")
+    post_id = serializers.CharField(help_text="MongoDB 게시물 ID")
     score = serializers.FloatField(help_text="검색 관련도 점수")
-    source = PostDocumentSerializer(help_text="게시물 데이터")
-    highlight = serializers.DictField(
-        required=False,
-        help_text="하이라이트된 검색 결과"
-    )
 
 
 class SearchResponseSerializer(serializers.Serializer):
