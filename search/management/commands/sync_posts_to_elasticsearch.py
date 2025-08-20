@@ -56,7 +56,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        self.stdout.write("🔄 MongoDB → Elasticsearch 데이터 동기화 시작")
+        self.stdout.write("MongoDB → Elasticsearch 데이터 동기화 시작")
         self.stdout.write("=" * 60)
         
         try:
@@ -96,12 +96,12 @@ class Command(BaseCommand):
         self.stdout.write("🔗 연결 상태 확인...")
         
         if not mongo_client.check_connection():
-            raise CommandError("❌ MongoDB 연결 실패!")
-        self.stdout.write("✅ MongoDB 연결 성공")
+            raise CommandError("MongoDB 연결 실패!")
+        self.stdout.write("MongoDB 연결 성공")
         
         if not es_client.check_connection():
-            raise CommandError("❌ Elasticsearch 연결 실패!")
-        self.stdout.write("✅ Elasticsearch 연결 성공")
+            raise CommandError("Elasticsearch 연결 실패!")
+        self.stdout.write("Elasticsearch 연결 성공")
 
     def _clear_existing_data(self, es_client: ElasticsearchClient):
         """기존 Elasticsearch 데이터 삭제"""
@@ -114,7 +114,7 @@ class Command(BaseCommand):
             response = s.delete()
             self.stdout.write(f"삭제된 문서 수: {response.get('deleted', 0)}개")
         except Exception as e:
-            self.stdout.write(self.style.WARNING(f"⚠️  데이터 삭제 중 오류: {str(e)}"))
+            self.stdout.write(self.style.WARNING(f"데이터 삭제 중 오류: {str(e)}"))
 
     def _full_sync(
         self, 
@@ -123,7 +123,7 @@ class Command(BaseCommand):
         options: Dict[str, Any]
     ) -> Dict[str, int]:
         """전체 동기화 실행"""
-        self.stdout.write("📚 전체 동기화 시작...")
+        self.stdout.write("전체 동기화 시작...")
         
         batch_size = options['batch_size']
         force_all = options['force_all']
@@ -180,7 +180,7 @@ class Command(BaseCommand):
         days = options['days']
         since_date = timezone.now() - timedelta(days=days)
         
-        self.stdout.write(f"📅 증분 동기화: {since_date.strftime('%Y-%m-%d')} 이후 업데이트")
+        self.stdout.write(f"증분 동기화: {since_date.strftime('%Y-%m-%d')} 이후 업데이트")
         
         batch_size = options['batch_size']
         dry_run = options['dry_run']

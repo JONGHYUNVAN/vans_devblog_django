@@ -155,7 +155,7 @@ class Command(BaseCommand):
             create_indexes()
             
             self.stdout.write(
-                self.style.SUCCESS('✅ 모든 인덱스가 성공적으로 생성되었습니다!')
+                self.style.SUCCESS('모든 인덱스가 성공적으로 생성되었습니다!')
             )
             self.stdout.write('생성된 인덱스:')
             self.stdout.write('  - vans_posts (게시물 검색용)')
@@ -224,7 +224,7 @@ class Command(BaseCommand):
             rebuild_indexes()
             
             self.stdout.write(
-                self.style.SUCCESS('✅ 모든 인덱스가 성공적으로 재구축되었습니다!')
+                self.style.SUCCESS('모든 인덱스가 성공적으로 재구축되었습니다!')
             )
             self.stdout.write('재구축된 인덱스:')
             self.stdout.write('  - vans_posts (게시물 검색용)')
@@ -236,7 +236,7 @@ class Command(BaseCommand):
     
     def print_help(self):
         """사용법 도움말을 출력합니다."""
-        self.stdout.write('\n📖 사용법:')
+        self.stdout.write('\n사용법:')
         self.stdout.write('  python manage.py create_search_indexes --create   # 인덱스 생성')
         self.stdout.write('  python manage.py create_search_indexes --delete   # 인덱스 삭제')
         self.stdout.write('  python manage.py create_search_indexes --rebuild  # 인덱스 재구축')

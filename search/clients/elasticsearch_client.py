@@ -309,7 +309,7 @@ class ElasticsearchClient:
             
         except Exception as e:
             logger.error(f"Search failed: {str(e)}")
-            raise RequestError(f"Search request failed: {str(e)}")
+            raise Exception(f"Search request failed: {str(e)}")
     
     def get_autocomplete_suggestions(
         self,
@@ -383,4 +383,35 @@ class ElasticsearchClient:
             logger.error(f"Autocomplete suggestion failed: {str(e)}")
             return []
     
-    
+    def get_popular_searches(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        인기 검색어 목록을 반환합니다.
+        
+        Args:
+            limit (int): 반환할 검색어 수 (기본값: 10)
+            
+        Returns:
+            List[Dict[str, Any]]: 인기 검색어 목록
+                각 항목은 {'query': str, 'count': int} 형태
+                
+        Example:
+            >>> popular = es_client.get_popular_searches(5)
+            >>> for item in popular:
+            ...     print(f"{item['query']}: {item['count']} searches")
+        """
+        try:
+            # 실제 구현에서는 검색 로그 데이터를 분석
+            # 현재는 더미 데이터 반환
+            dummy_popular = [
+                {"query": "Django", "count": 150},
+                {"query": "Python", "count": 120},
+                {"query": "Elasticsearch", "count": 95},
+                {"query": "REST API", "count": 80},
+                {"query": "웹 개발", "count": 75}
+            ]
+            
+            return dummy_popular[:limit]
+            
+        except Exception as e:
+            logger.error(f"Failed to get popular searches: {str(e)}")
+            return []

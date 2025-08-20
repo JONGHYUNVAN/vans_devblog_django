@@ -104,7 +104,7 @@ python manage.py runserver 8001
 - **Elasticsearch**: http://localhost:9200/
 - **Cerebro GUI**: http://localhost:9000/
 
-## 📁 폴더더 구조
+## 📁 폴더 구조
 
 ```
 vans_devblog_django/

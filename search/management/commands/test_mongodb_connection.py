@@ -42,9 +42,9 @@ class Command(BaseCommand):
             
             # 연결 테스트
             if mongo_client.check_connection():
-                self.stdout.write(self.style.SUCCESS("✅ MongoDB 연결 성공!"))
+                self.stdout.write(self.style.SUCCESS("MongoDB 연결 성공!"))
             else:
-                raise CommandError("❌ MongoDB 연결 실패!")
+                raise CommandError("MongoDB 연결 실패!")
             
             # 기본 정보 출력
             self._show_database_info(mongo_client)
@@ -54,7 +54,7 @@ class Command(BaseCommand):
                 self._show_posts(mongo_client, options['limit'], options['all_posts'])
             
             mongo_client.close()
-            self.stdout.write(self.style.SUCCESS("\n🎉 MongoDB 테스트 완료!"))
+            self.stdout.write(self.style.SUCCESS("\n MongoDB 테스트 완료!"))
             
         except Exception as e:
             logger.error(f"MongoDB test failed: {str(e)}")
@@ -62,7 +62,7 @@ class Command(BaseCommand):
 
     def _show_database_info(self, mongo_client: MongoDBClient):
         """데이터베이스 기본 정보 출력"""
-        self.stdout.write("\n📊 데이터베이스 정보:")
+        self.stdout.write("\n 데이터베이스 정보:")
         self.stdout.write("-" * 30)
         
         try:
@@ -70,12 +70,12 @@ class Command(BaseCommand):
             total_posts = mongo_client.get_posts_count()
             published_posts = mongo_client.get_posts_count({"is_published": True})
             
-            self.stdout.write(f"📝 전체 게시물: {total_posts}개")
-            self.stdout.write(f"🌟 발행된 게시물: {published_posts}개")
+            self.stdout.write(f"전체 게시물: {total_posts}개")
+            self.stdout.write(f"발행된 게시물: {published_posts}개")
             
             # 카테고리 목록
             categories = mongo_client.get_categories()
-            self.stdout.write(f"🏷️  카테고리: {len(categories)}개")
+            self.stdout.write(f"카테고리: {len(categories)}개")
             if categories:
                 self.stdout.write(f"   → {', '.join(categories[:5])}")
                 if len(categories) > 5:
@@ -83,7 +83,7 @@ class Command(BaseCommand):
             
             # 태그 목록
             tags = mongo_client.get_all_tags()
-            self.stdout.write(f"🔖 태그: {len(tags)}개")
+            self.stdout.write(f"태그: {len(tags)}개")
             if tags:
                 self.stdout.write(f"   → {', '.join(tags[:10])}")
                 if len(tags) > 10:
@@ -95,7 +95,7 @@ class Command(BaseCommand):
     def _show_posts(self, mongo_client: MongoDBClient, limit: int, show_all: bool = False):
         """게시물 목록 출력"""
         post_type = "모든 게시물" if show_all else "발행된 게시물"
-        self.stdout.write(f"\n📚 최근 {post_type} {limit}개:")
+        self.stdout.write(f"\n최근 {post_type} {limit}개:")
         self.stdout.write("-" * 30)
         
         try:
@@ -123,4 +123,4 @@ class Command(BaseCommand):
                 self.stdout.write(f"📭 {post_type}이 없습니다.")
                 
         except Exception as e:
-            self.stdout.write(self.style.WARNING(f"⚠️  게시물 조회 중 오류: {str(e)}"))
+            self.stdout.write(self.style.WARNING(f" 게시물 조회 중 오류: {str(e)}"))
