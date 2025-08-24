@@ -21,7 +21,7 @@ redis==5.0.1
 
 # Elasticsearch
 django-elasticsearch-dsl==7.3.0
-elasticsearch==8.11.0
+elasticsearch==7.17.9
 
 # MongoDB
 pymongo==4.5.0

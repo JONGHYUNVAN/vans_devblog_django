@@ -37,11 +37,11 @@ CloudType.io 대시보드에서 다음 환경 변수를 설정하세요:
 ```bash
 # Django 설정
 DJANGO_SETTINGS_MODULE=vans_search_service.settings.cloudtype
-SECRET_KEY=시크릿 키키
+SECRET_KEY=시크릿 키
 DEBUG=False
 
 # 허용 호스트 (CloudType.io 도메인 자동 추가됨)
-ALLOWED_HOSTS=허용 호스트트
+ALLOWED_HOSTS=허용 호스트
 
 # 데이터베이스 (CloudType.io에서 제공)
 DATABASE_URL=postgresql://user:password@host:port/dbname
