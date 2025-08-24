@@ -1,0 +1,48 @@
+# =============================================================================
+# VansDevBlog Search Service - CloudType.io Requirements
+# CloudType.io 배포용 패키지 목록
+# =============================================================================
+
+# 기본 Django 패키지
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+
+# 정적 파일 처리
+whitenoise==6.6.0
+
+# 데이터베이스
+dj-database-url==2.1.0
+psycopg2-binary==2.9.7
+
+# 캐싱 (선택사항)
+django-redis==5.4.0
+redis==5.0.1
+
+# Elasticsearch
+django-elasticsearch-dsl==7.3.0
+elasticsearch==8.11.0
+
+# MongoDB
+pymongo==4.5.0
+
+# MariaDB/MySQL (검색 로그용)
+PyMySQL==1.1.0
+
+# API 문서화
+drf-yasg==1.21.7
+
+# 환경 변수
+python-dotenv==1.0.0
+
+# 데이터 검증
+pydantic==2.1.1
+
+# WSGI 서버
+gunicorn==21.2.0
+
+# 유틸리티
+requests==2.31.0
+python-dateutil==2.8.2
+
+

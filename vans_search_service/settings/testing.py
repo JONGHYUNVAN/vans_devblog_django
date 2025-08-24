@@ -14,6 +14,20 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver']
 
+# 테스트용 최소한의 앱만 사용
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'rest_framework',
+    'search',
+]
+
+# 테스트용 간단한 URL 설정 (admin 제외)
+ROOT_URLCONF = 'tests.test_urls'
+
 # =============================================================================
 # DATABASE SETTINGS (테스트용)
 # =============================================================================
