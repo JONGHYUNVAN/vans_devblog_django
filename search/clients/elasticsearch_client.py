@@ -5,6 +5,7 @@ Elasticsearch 연결 및 검색 기능을 제공하는 클라이언트 클래스
 """
 
 import logging
+from typing import Any, Dict, List, Optional
 
 from elasticsearch_dsl.connections import connections
 

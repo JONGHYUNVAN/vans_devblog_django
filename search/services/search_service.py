@@ -2,8 +2,6 @@ import logging
 import math
 from typing import Any, Dict, List
 
-from django.conf import settings
-
 from ..clients.elasticsearch_client import ElasticsearchClient
 from ..clients.mongodb_client import MongoDBClient
 from ..models import PopularSearch

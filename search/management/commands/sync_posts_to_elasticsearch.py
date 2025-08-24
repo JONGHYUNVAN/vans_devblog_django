@@ -6,8 +6,8 @@ VansDevBlog의 MongoDB Post 데이터를 Elasticsearch로 동기화하여
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import timedelta
+from typing import Any, Dict, List
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone

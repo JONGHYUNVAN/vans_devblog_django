@@ -4,9 +4,6 @@ VansDevBlog Search Service Serializers
 Django REST Framework용 시리얼라이저를 정의합니다.
 """
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional
-
 from rest_framework import serializers
 
 
