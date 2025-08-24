@@ -9,7 +9,7 @@ djangorestframework==3.14.0
 django-cors-headers==4.3.1
 
 # Elasticsearch 연동
-django-elasticsearch-dsl==7.3.0
+django-elasticsearch-dsl>=8.0,<9.0
 elasticsearch==8.11.0
 
 # API 문서화
@@ -23,7 +23,7 @@ pymongo==4.5.0              # MongoDB 연결
 python-dotenv==1.0.0
 
 # 데이터 검증
-pydantic==2.1.1
+pydantic<2.0
 
 # 날짜/시간 처리
 python-dateutil==2.8.2

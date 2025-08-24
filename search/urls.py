@@ -5,11 +5,11 @@ VansDevBlog Search Service URL Configuration
 새로운 구조에서는 API 레이어로 라우팅을 위임합니다.
 """
 
-from django.urls import path, include
+from django.urls import include, path
 
-app_name = 'search'
+app_name = "search"
 
 urlpatterns = [
     # API 레이어로 모든 요청 위임
-    path('', include('search.api.urls')),
+    path("", include("search.api.urls")),
 ]
