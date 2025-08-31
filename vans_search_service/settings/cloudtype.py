@@ -12,6 +12,7 @@ from .base import (
     get_env_variable,
     MIDDLEWARE,
     DATABASES,
+    INSTALLED_APPS,
 )
 
 # =============================================================================
@@ -24,6 +25,9 @@ allowed_hosts_env = get_env_variable("ALLOWED_HOSTS", "")
 ALLOWED_HOSTS = [
     "*.cloudtype.app",
 ]
+
+# Add this line to ensure INSTALLED_APPS from base.py is used
+INSTALLED_APPS = INSTALLED_APPS
 
 # 환경변수에서 추가 호스트 설정
 if allowed_hosts_env:
