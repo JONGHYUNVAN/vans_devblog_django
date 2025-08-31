@@ -32,18 +32,28 @@ class ElasticsearchClient:
         >>> print(f"Found {results['total']} posts")
     """
 
-    def __init__(self):
+    def __init__(self, timeout: Optional[int] = None):
         """
         ElasticsearchClient 인스턴스를 초기화합니다.
 
         Django 설정에서 Elasticsearch 연결 정보를 가져와서
         클라이언트 연결을 설정합니다.
 
+        Args:
+            timeout (Optional[int]): 연결 타임아웃 (초)
+
         Raises:
             ConnectionError: Elasticsearch 서버에 연결할 수 없는 경우
         """
         try:
-            self.client = connections.get_connection()
+            from django.conf import settings
+            from elasticsearch import Elasticsearch
+
+            es_config = settings.ELASTICSEARCH_DSL['default'].copy()
+            if timeout:
+                es_config['timeout'] = timeout
+            
+            self.client = Elasticsearch(**es_config)
             logger.info("Elasticsearch client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Elasticsearch client: {str(e)}")
@@ -234,17 +244,18 @@ class ElasticsearchClient:
                         {"term": {"language": filters["language"]}}
                     )
 
-                if filters.get("date_range"):
-                    date_filter = {"range": {"published_date": {}}}
-                    if filters["date_range"].get("start"):
-                        date_filter["range"]["published_date"]["gte"] = filters[
-                            "date_range"
-                        ]["start"]
-                    if filters["date_range"].get("end"):
-                        date_filter["range"]["published_date"]["lte"] = filters[
-                            "date_range"
-                        ]["end"]
-                    filter_conditions.append(date_filter)
+                # date_range 필터 제거됨 (published_date 없음)
+                # if filters.get("date_range"):
+                #     date_filter = {"range": {"published_date": {}}}
+                #     if filters["date_range"].get("start"):
+                #         date_filter["range"]["published_date"]["gte"] = filters[
+                #             "date_range"
+                #         ]["start"]
+                #     if filters["date_range"].get("end"):
+                #         date_filter["range"]["published_date"]["lte"] = filters[
+                #             "date_range"
+                #         ]["end"]
+                #     filter_conditions.append(date_filter)
 
             # 전체 쿼리 구성
             body = {
@@ -258,11 +269,12 @@ class ElasticsearchClient:
                         "summary": {},
                     }
                 },
-                "aggs": {
-                    "categories": {"terms": {"field": "category", "size": 10}},
-                    "tags": {"terms": {"field": "tags", "size": 20}},
-                    "languages": {"terms": {"field": "language"}},
-                },
+                # aggregation 제거 (fielddata 오류 방지)
+                # "aggs": {
+                #     "categories": {"terms": {"field": "category", "size": 10}},
+                #     "tags": {"terms": {"field": "tags", "size": 20}},
+                #     "languages": {"terms": {"field": "language"}},
+                # },
                 "from": (page - 1) * page_size,
                 "size": page_size,
             }
@@ -273,7 +285,7 @@ class ElasticsearchClient:
             else:
                 body["sort"] = [
                     {"_score": {"order": "desc"}},
-                    {"published_date": {"order": "desc"}},
+                    # {"published_date": {"order": "desc"}},  # published_date 제거됨
                 ]
 
             # 검색 실행
@@ -324,24 +336,20 @@ class ElasticsearchClient:
             ['Django', 'Django REST', 'Django Tutorial']
         """
         try:
-            # 제목에서 자동완성 검색
+            # 간단한 검색 기반 자동완성 (completion suggester 대신)
             body = {
-                "suggest": {
-                    "title_suggest": {
-                        "prefix": prefix,
-                        "completion": {
-                            "field": "title.suggest",
-                            "size": size,
-                            "contexts": {"language": [language]}
-                            if suggestion_type
-                            else {},
-                        },
-                    },
-                    "tag_suggest": {
-                        "prefix": prefix,
-                        "completion": {"field": "tags.suggest", "size": size},
-                    },
-                }
+                "query": {
+                    "bool": {
+                        "should": [
+                            {"prefix": {"title": prefix}},
+                            {"prefix": {"title.raw": prefix}},
+                            {"prefix": {"tags": prefix}},
+                        ],
+                        "minimum_should_match": 1,
+                    }
+                },
+                "size": size,
+                "_source": ["title", "tags"],
             }
 
             response = self.client.search(index="vans_posts", body=body)
@@ -349,13 +357,19 @@ class ElasticsearchClient:
             # 제안 추출 및 중복 제거
             suggestions = set()
 
-            for suggest_result in response["suggest"]["title_suggest"]:
-                for option in suggest_result["options"]:
-                    suggestions.add(option["text"])
-
-            for suggest_result in response["suggest"]["tag_suggest"]:
-                for option in suggest_result["options"]:
-                    suggestions.add(option["text"])
+            for hit in response["hits"]["hits"]:
+                source = hit["_source"]
+                title = source.get("title", "")
+                tags = source.get("tags", [])
+                
+                # 제목에서 제안 추출
+                if title.lower().startswith(prefix.lower()):
+                    suggestions.add(title)
+                
+                # 태그에서 제안 추출
+                for tag in tags:
+                    if tag.lower().startswith(prefix.lower()):
+                        suggestions.add(tag)
 
             result = list(suggestions)[:size]
             logger.debug(

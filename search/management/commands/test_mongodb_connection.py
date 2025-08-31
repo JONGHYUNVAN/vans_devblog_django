@@ -8,7 +8,7 @@ import logging
 
 from django.core.management.base import BaseCommand, CommandError
 
-from search.utils.mongodb_client import MongoDBClient
+from search.clients.mongodb_client import MongoDBClient
 
 logger = logging.getLogger("search")
 
@@ -24,7 +24,7 @@ class Command(BaseCommand):
         parser.add_argument("--limit", type=int, default=5, help="출력할 게시물 수 (기본값: 5)")
 
     def handle(self, *args, **options):
-        self.stdout.write("🔗 MongoDB 연결 테스트 시작...")
+        self.stdout.write("MongoDB 연결 테스트 시작...")
         self.stdout.write("=" * 50)
 
         try:
@@ -81,7 +81,7 @@ class Command(BaseCommand):
                     self.stdout.write(f"   → ... 외 {len(tags) - 10}개")
 
         except Exception as e:
-            self.stdout.write(self.style.WARNING(f"⚠️  정보 조회 중 오류: {str(e)}"))
+            self.stdout.write(self.style.WARNING(f"정보 조회 중 오류: {str(e)}"))
 
     def _show_posts(
         self, mongo_client: MongoDBClient, limit: int, show_all: bool = False
@@ -106,7 +106,7 @@ class Command(BaseCommand):
                 published_date = post.get("published_date", "Unknown")
                 is_published = post.get("is_published", False)
 
-                status = "✅" if is_published else "❌"
+                status = "[v]" if is_published else "[x]"
 
                 self.stdout.write(
                     f"{count}. {status} [{category}] {title}" f" - {published_date}"
@@ -116,7 +116,7 @@ class Command(BaseCommand):
                     break
 
             if count == 0:
-                self.stdout.write(f"📭 {post_type}이 없습니다.")
+                self.stdout.write(f"{post_type}이 없습니다.")
 
         except Exception as e:
-            self.stdout.write(self.style.WARNING(f" 게시물 조회 중 오류: {str(e)}"))
+            self.stdout.write(self.style.WARNING(f"게시물 조회 중 오류: {str(e)}"))

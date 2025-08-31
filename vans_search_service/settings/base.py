@@ -14,6 +14,17 @@ from . import get_env_variable
 # Load environment variables
 load_dotenv()
 
+# .env 파일 로딩 확인
+import os
+from pathlib import Path
+env_path = Path(__file__).resolve().parent.parent.parent / '.env'
+print(f"Django 설정 로딩 중 (base.py)...")
+print(f".env 파일 경로: {env_path}")
+print(f".env 파일 존재: {env_path.exists()}")
+if env_path.exists():
+    load_dotenv(env_path, override=True)
+    print(f".env 파일을 강제로 다시 로드했습니다")
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -194,29 +205,75 @@ SWAGGER_SETTINGS = {
 # ELASTICSEARCH SETTINGS
 # =============================================================================
 
+# Elasticsearch 환경변수 로깅
+ELASTICSEARCH_HOST = get_env_variable('ELASTICSEARCH_HOST')
+ELASTICSEARCH_USERNAME = get_env_variable('ELASTICSEARCH_USERNAME')
+ELASTICSEARCH_PASSWORD = get_env_variable('ELASTICSEARCH_PASSWORD')
+
+print(f"Elasticsearch 설정:")
+print(f"ELASTICSEARCH_HOST: {ELASTICSEARCH_HOST}")
+print(f"ELASTICSEARCH_USERNAME: {ELASTICSEARCH_USERNAME}")
+print(f"ELASTICSEARCH_PASSWORD: {'***' if ELASTICSEARCH_PASSWORD else 'None'}")
+
+if not ELASTICSEARCH_HOST:
+    print("ELASTICSEARCH_HOST 환경변수가 설정되지 않았습니다!")
+if not ELASTICSEARCH_USERNAME:
+    print("ELASTICSEARCH_USERNAME 환경변수가 설정되지 않았습니다!")
+if not ELASTICSEARCH_PASSWORD:
+    print("ELASTICSEARCH_PASSWORD 환경변수가 설정되지 않았습니다!")
+
 ELASTICSEARCH_DSL = {
     "default": {
-        "hosts": [f"http://{get_env_variable('ELASTICSEARCH_HOST', 'localhost:9200')}"],
-        "timeout": 20,
+        "hosts": [f"https://{ELASTICSEARCH_HOST}"],
+        "timeout": 30,
         "max_retries": 3,
         "retry_on_timeout": True,
+        "verify_certs": False,
+        "http_auth": (ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD),
     },
 }
+
+print(f"Elasticsearch 연결: https://{ELASTICSEARCH_HOST}")
 
 # =============================================================================
 # MONGODB SETTINGS
 # =============================================================================
 
+# MongoDB 환경변수 로깅
+MONGODB_HOST = get_env_variable("MONGODB_HOST")
+MONGODB_PORT = get_env_variable("MONGODB_PORT", "27017")
+MONGODB_DATABASE = get_env_variable("MONGODB_DATABASE")
+MONGODB_USERNAME = get_env_variable("MONGODB_USERNAME")
+MONGODB_PASSWORD = get_env_variable("MONGODB_PASSWORD")
+
+print(f"MongoDB 설정:")
+print(f"MONGODB_HOST: {MONGODB_HOST}")
+print(f"MONGODB_PORT: {MONGODB_PORT}")
+print(f"MONGODB_DATABASE: {MONGODB_DATABASE}")
+print(f"MONGODB_USERNAME: {MONGODB_USERNAME}")
+print(f"MONGODB_PASSWORD: {'***' if MONGODB_PASSWORD else 'None'}")
+
+if not MONGODB_HOST:
+    print("MONGODB_HOST 환경변수가 설정되지 않았습니다!")
+if not MONGODB_DATABASE:
+    print("MONGODB_DATABASE 환경변수가 설정되지 않았습니다!")
+if not MONGODB_USERNAME:
+    print("MONGODB_USERNAME 환경변수가 설정되지 않았습니다!")
+if not MONGODB_PASSWORD:
+    print("MONGODB_PASSWORD 환경변수가 설정되지 않았습니다!")
+
 MONGODB_SETTINGS = {
-    "host": get_env_variable("MONGODB_HOST", "localhost"),
-    "port": int(get_env_variable("MONGODB_PORT", "27017")),
-    "database": get_env_variable("MONGODB_DATABASE", "devblog"),
-    "username": get_env_variable("MONGODB_USERNAME", ""),
-    "password": get_env_variable("MONGODB_PASSWORD", ""),
+    "host": MONGODB_HOST,
+    "port": int(MONGODB_PORT),
+    "database": MONGODB_DATABASE,
+    "username": MONGODB_USERNAME,
+    "password": MONGODB_PASSWORD,
     "auth_source": get_env_variable("MONGODB_AUTH_SOURCE", "admin"),
     "direct_connection": get_env_variable("MONGODB_DIRECT_CONNECTION", "true").lower()
     == "true",
 }
+
+print(f"MongoDB 연결: {MONGODB_HOST}:{MONGODB_PORT}/{MONGODB_DATABASE}")
 
 # =============================================================================
 # CACHING SETTINGS

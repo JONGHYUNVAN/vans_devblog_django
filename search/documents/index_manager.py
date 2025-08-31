@@ -26,13 +26,14 @@ class IndexManager:
     def _setup_connection(self):
         """Elasticsearch 연결을 설정합니다."""
         try:
+            es_config = settings.ELASTICSEARCH_DSL["default"]
             connections.create_connection(
-                hosts=settings.ELASTICSEARCH_DSL["default"]["hosts"],
-                timeout=settings.ELASTICSEARCH_DSL["default"].get("timeout", 20),
-                max_retries=settings.ELASTICSEARCH_DSL["default"].get("max_retries", 3),
-                retry_on_timeout=settings.ELASTICSEARCH_DSL["default"].get(
-                    "retry_on_timeout", True
-                ),
+                hosts=es_config["hosts"],
+                timeout=es_config.get("timeout", 20),
+                max_retries=es_config.get("max_retries", 3),
+                retry_on_timeout=es_config.get("retry_on_timeout", True),
+                verify_certs=es_config.get("verify_certs", True),
+                http_auth=es_config.get("http_auth"),
             )
             logger.info("Elasticsearch connection established")
         except Exception as e:

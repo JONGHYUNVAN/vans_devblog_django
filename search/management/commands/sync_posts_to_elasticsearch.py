@@ -13,8 +13,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from search.documents import PostDocument
-from search.utils.elasticsearch_client import ElasticsearchClient
-from search.utils.mongodb_client import MongoDBClient
+from search.clients.elasticsearch_client import ElasticsearchClient
+from search.clients.mongodb_client import MongoDBClient
 
 logger = logging.getLogger("search")
 
@@ -216,7 +216,7 @@ class Command(BaseCommand):
                     continue
 
                 # Elasticsearch 문서 생성 및 저장
-                es_doc = self._convert_to_elasticsearch_document(post)
+                es_doc = PostDocument.create_from_mongo_post(post)
                 es_doc.save()
 
                 batch_result["synced"] += 1
@@ -246,95 +246,7 @@ class Command(BaseCommand):
 
         return True
 
-    def _convert_to_elasticsearch_document(self, post: Dict[str, Any]) -> PostDocument:
-        """MongoDB 문서를 Elasticsearch PostDocument로 변환"""
-
-        # 언어 감지 (한국어/영어)
-        title = str(post.get("title", ""))
-        content = str(post.get("content", ""))
-        text_for_detection = f"{title} {content}"
-        language = self._detect_language(text_for_detection)
-
-        # 작성자 정보 처리
-        author_info = post.get("author", {})
-        if isinstance(author_info, dict):
-            author = {
-                "user_id": str(author_info.get("_id", "")),
-                "username": author_info.get("username", ""),
-                "display_name": author_info.get("display_name", ""),
-                "profile_image": author_info.get("profile_image", ""),
-            }
-        else:
-            author = {
-                "user_id": "",
-                "username": "",
-                "display_name": "",
-                "profile_image": "",
-            }
-
-        # 태그 처리
-        tags = post.get("tags", [])
-        if isinstance(tags, str):
-            tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
-        elif not isinstance(tags, list):
-            tags = []
-
-        # 요약문 생성
-        summary = post.get("summary", "")
-        if not summary and content:
-            summary = content[:200] + "..." if len(content) > 200 else content
-
-        # PostDocument 생성
-        es_doc = PostDocument(
-            meta={"id": str(post["_id"])},
-            post_id=str(post["_id"]),
-            title=title,
-            content=content,
-            summary=summary,
-            slug=post.get("slug", ""),
-            theme=post.get("theme", ""),
-            category=post.get("category", ""),
-            tags=tags,
-            author=author,
-            published_date=post.get("published_date"),
-            updated_date=post.get("updated_date"),
-            view_count=post.get("view_count", 0),
-            like_count=post.get("like_count", 0),
-            comment_count=post.get("comment_count", 0),
-            is_published=post.get("is_published", False),
-            language=language,
-            reading_time=self._calculate_reading_time(content),
-            featured_image=post.get("featured_image", ""),
-            meta_description=post.get("meta_description", summary[:150]),
-            search_boost=1.0,
-        )
-
-        return es_doc
-
-    def _detect_language(self, text: str) -> str:
-        """텍스트 언어 감지 (간단한 휴리스틱)"""
-        if not text or not isinstance(text, str):
-            return "ko"
-
-        # 한글 문자 개수 계산
-        korean_chars = sum(1 for c in text if "\uac00" <= c <= "\ud7af")
-        total_chars = len([c for c in text if c.isalpha()])
-
-        if total_chars == 0:
-            return "ko"
-
-        korean_ratio = korean_chars / total_chars
-        return "ko" if korean_ratio > 0.3 else "en"
-
-    def _calculate_reading_time(self, content: str) -> int:
-        """읽기 시간 계산 (분 단위)"""
-        if not content:
-            return 1
-
-        word_count = len(content.split())
-        # 평균 읽기 속도: 분당 200단어
-        reading_time = max(1, word_count // 200)
-        return reading_time
+    
 
     def _update_result(
         self, total_result: Dict[str, int], batch_result: Dict[str, int]

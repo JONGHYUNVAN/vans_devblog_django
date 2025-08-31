@@ -1,2 +1,3 @@
-web: gunicorn --bind 0.0.0.0:$PORT vans_search_service.wsgi:application
+web: gunicorn -c gunicorn.conf.py vans_search_service.wsgi:application
+release: python cloudtype-deploy.sh
 

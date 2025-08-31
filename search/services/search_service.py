@@ -197,24 +197,25 @@ class SearchService:
         category: str,
         tags: List[str],
         language: str,
-        date_from: Any,
-        date_to: Any,
+        date_from: Any,  # 사용하지 않음
+        date_to: Any,    # 사용하지 않음
     ) -> Dict[str, Any]:
         filters = {
             "theme": theme,
             "category": category,
             "tags": tags,
             "language": language if language != "all" else None,
-            "date_range": {},
+            # "date_range": {},  # published_date 제거됨
         }
 
-        if date_from:
-            filters["date_range"]["start"] = date_from
-        if date_to:
-            filters["date_range"]["end"] = date_to
+        # date_range 필터 제거됨
+        # if date_from:
+        #     filters["date_range"]["start"] = date_from
+        # if date_to:
+        #     filters["date_range"]["end"] = date_to
 
-        if not filters["date_range"]:
-            filters.pop("date_range")
+        # if not filters["date_range"]:
+        #     filters.pop("date_range")
 
         return filters
 
@@ -222,10 +223,10 @@ class SearchService:
         sort_mapping = {
             "relevance": [
                 {"_score": {"order": "desc"}},
-                {"published_date": {"order": "desc"}},
+                # {"published_date": {"order": "desc"}},  # published_date 제거됨
             ],
-            "date_desc": [{"published_date": {"order": "desc"}}],
-            "date_asc": [{"published_date": {"order": "asc"}}],
+            # "date_desc": [{"published_date": {"order": "desc"}}],  # published_date 제거됨
+            # "date_asc": [{"published_date": {"order": "asc"}}],    # published_date 제거됨
             "views_desc": [{"view_count": {"order": "desc"}}],
             "likes_desc": [{"like_count": {"order": "desc"}}],
         }

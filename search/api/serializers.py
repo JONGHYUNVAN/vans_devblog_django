@@ -369,3 +369,161 @@ class PopularSearchesResponseSerializer(serializers.Serializer):
     popular_searches = serializers.ListField(
         child=serializers.DictField(), help_text="인기 검색어 목록 (query, count 포함)"
     )
+
+
+class SyncRequestSerializer(serializers.Serializer):
+    """
+    데이터 동기화 요청 시리얼라이저.
+
+    MongoDB에서 Elasticsearch로 데이터를 동기화하는 요청을 검증합니다.
+
+    Attributes:
+        batch_size (int): 배치 처리 크기
+        force_all (bool): 발행 여부 무관 전체 동기화
+        incremental (bool): 증분 동기화 여부
+        days (int): 증분 동기화 시 확인할 일수
+        clear_existing (bool): 기존 데이터 삭제 여부
+        dry_run (bool): 실제 동기화 없이 확인만
+
+    Example:
+        >>> request_data = {
+        ...     "batch_size": 50,
+        ...     "force_all": False,
+        ...     "incremental": True,
+        ...     "days": 7
+        ... }
+        >>> serializer = SyncRequestSerializer(data=request_data)
+        >>> serializer.is_valid()
+        True
+    """
+
+    batch_size = serializers.IntegerField(
+        default=50, min_value=1, max_value=500, help_text="배치 처리 크기 (기본값: 50)"
+    )
+    force_all = serializers.BooleanField(
+        default=False, help_text="발행 여부와 관계없이 모든 게시물을 동기화합니다."
+    )
+    incremental = serializers.BooleanField(
+        default=False, help_text="증분 동기화: 최근 업데이트된 게시물만 동기화합니다."
+    )
+    days = serializers.IntegerField(
+        default=7, min_value=1, max_value=365, help_text="증분 동기화 시 확인할 일수 (기본값: 7일)"
+    )
+    clear_existing = serializers.BooleanField(
+        default=False, help_text="기존 Elasticsearch 데이터를 모두 삭제하고 새로 동기화합니다."
+    )
+    dry_run = serializers.BooleanField(
+        default=False, help_text="실제 동기화 없이 처리할 데이터만 확인합니다."
+    )
+
+    def validate(self, attrs):
+        """
+        전체 데이터를 검증합니다.
+
+        Args:
+            attrs (Dict): 검증할 데이터
+
+        Returns:
+            Dict: 검증된 데이터
+
+        Raises:
+            ValidationError: 검증 실패
+        """
+        if attrs.get("incremental") and attrs.get("force_all"):
+            raise serializers.ValidationError(
+                "incremental과 force_all 옵션은 동시에 사용할 수 없습니다."
+            )
+
+        return attrs
+
+
+class SyncResponseSerializer(serializers.Serializer):
+    """
+    데이터 동기화 응답 시리얼라이저.
+
+    동기화 결과를 직렬화합니다.
+
+    Attributes:
+        status (str): 동기화 상태
+        type (str): 동기화 타입 (full/incremental)
+        processed (int): 처리된 게시물 수
+        synced (int): 동기화 성공한 게시물 수
+        skipped (int): 건너뛴 게시물 수
+        errors (int): 오류 발생한 게시물 수
+        success_rate (float): 성공률
+        execution_time (float): 실행 시간 (초)
+        message (str): 결과 메시지
+
+    Example:
+        >>> response = {
+        ...     "status": "completed",
+        ...     "type": "incremental",
+        ...     "processed": 100,
+        ...     "synced": 95,
+        ...     "skipped": 3,
+        ...     "errors": 2,
+        ...     "success_rate": 95.0,
+        ...     "execution_time": 15.5,
+        ...     "message": "동기화가 성공적으로 완료되었습니다."
+        ... }
+        >>> serializer = SyncResponseSerializer(response)
+    """
+
+    status = serializers.ChoiceField(
+        choices=[
+            ("started", "시작됨"),
+            ("completed", "완료됨"),
+            ("failed", "실패"),
+            ("partial", "부분 완료"),
+        ],
+        help_text="동기화 상태",
+    )
+    type = serializers.ChoiceField(
+        choices=[("full", "전체 동기화"), ("incremental", "증분 동기화")],
+        help_text="동기화 타입",
+    )
+    processed = serializers.IntegerField(help_text="처리된 게시물 수")
+    synced = serializers.IntegerField(help_text="동기화 성공한 게시물 수")
+    skipped = serializers.IntegerField(help_text="건너뛴 게시물 수")
+    errors = serializers.IntegerField(help_text="오류 발생한 게시물 수")
+    success_rate = serializers.FloatField(help_text="성공률 (%)")
+    execution_time = serializers.FloatField(help_text="실행 시간 (초)")
+    message = serializers.CharField(help_text="결과 메시지")
+
+
+class SyncStatusSerializer(serializers.Serializer):
+    """
+    동기화 상태 조회 응답 시리얼라이저.
+
+    현재 동기화 상태 정보를 직렬화합니다.
+
+    Attributes:
+        mongodb_connected (bool): MongoDB 연결 상태
+        elasticsearch_connected (bool): Elasticsearch 연결 상태
+        total_posts_in_mongodb (int): MongoDB 총 게시물 수
+        published_posts_in_mongodb (int): MongoDB 발행된 게시물 수
+        total_docs_in_elasticsearch (int): Elasticsearch 총 문서 수
+        last_sync_time (datetime): 마지막 동기화 시간
+        sync_needed (bool): 동기화 필요 여부
+
+    Example:
+        >>> status = {
+        ...     "mongodb_connected": True,
+        ...     "elasticsearch_connected": True,
+        ...     "total_posts_in_mongodb": 500,
+        ...     "published_posts_in_mongodb": 450,
+        ...     "total_docs_in_elasticsearch": 440,
+        ...     "sync_needed": True
+        ... }
+        >>> serializer = SyncStatusSerializer(status)
+    """
+
+    mongodb_connected = serializers.BooleanField(help_text="MongoDB 연결 상태")
+    elasticsearch_connected = serializers.BooleanField(help_text="Elasticsearch 연결 상태")
+    total_posts_in_mongodb = serializers.IntegerField(help_text="MongoDB 총 게시물 수")
+    published_posts_in_mongodb = serializers.IntegerField(help_text="MongoDB 발행된 게시물 수")
+    total_docs_in_elasticsearch = serializers.IntegerField(help_text="Elasticsearch 총 문서 수")
+    last_sync_time = serializers.DateTimeField(
+        required=False, allow_null=True, help_text="마지막 동기화 시간"
+    )
+    sync_needed = serializers.BooleanField(help_text="동기화 필요 여부")

@@ -209,14 +209,46 @@ SWAGGER_SETTINGS = {
 # ELASTICSEARCH SETTINGS
 # =============================================================================
 
-ELASTICSEARCH_DSL = {
-    "default": {
-        "hosts": [f"http://{os.getenv('ELASTICSEARCH_HOST', 'localhost:9200')}"],
-        "timeout": 20,
-        "max_retries": 3,
-        "retry_on_timeout": True,
-    },
+# Elasticsearch 설정 추가 함수
+def get_env_variable(var_name, default_value=None):
+    """환경변수 값을 가져옵니다."""
+    return os.getenv(var_name, default_value)
+
+# CloudType Elasticsearch 설정
+ELASTICSEARCH_HOST = get_env_variable("ELASTICSEARCH_HOST")
+ELASTICSEARCH_USERNAME = get_env_variable("ELASTICSEARCH_USERNAME")
+ELASTICSEARCH_PASSWORD = get_env_variable("ELASTICSEARCH_PASSWORD")
+
+# 시작 시 환경변수 및 연결 상태 로깅
+import logging
+logger = logging.getLogger(__name__)
+
+print(f"🔧 Django 설정 로딩 중...")
+print(f"📍 ELASTICSEARCH_HOST: {ELASTICSEARCH_HOST}")
+print(f"👤 ELASTICSEARCH_USERNAME: {ELASTICSEARCH_USERNAME}")
+print(f"🔐 ELASTICSEARCH_PASSWORD: {'***' if ELASTICSEARCH_PASSWORD else 'None'}")
+
+if not ELASTICSEARCH_HOST:
+    print("❌ ELASTICSEARCH_HOST 환경변수가 설정되지 않았습니다!")
+if not ELASTICSEARCH_USERNAME:
+    print("❌ ELASTICSEARCH_USERNAME 환경변수가 설정되지 않았습니다!")
+if not ELASTICSEARCH_PASSWORD:
+    print("❌ ELASTICSEARCH_PASSWORD 환경변수가 설정되지 않았습니다!")
+
+# CloudType Elasticsearch 전용 설정
+es_config = {
+    "hosts": [f"https://{ELASTICSEARCH_HOST}"],
+    "timeout": 30,
+    "verify_certs": False,  # 개발환경에서는 SSL 인증서 검증 비활성화
+    "http_auth": (ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD),
 }
+
+ELASTICSEARCH_DSL = {
+    "default": es_config,
+}
+
+print(f"⚙️  Elasticsearch 설정: https://{ELASTICSEARCH_HOST}")
+print(f"🔗 연결 테스트는 Django 시작 후 수행됩니다.")
 
 
 # =============================================================================
@@ -257,12 +289,31 @@ MONGODB_SETTINGS = {
 # MONGODB SETTINGS
 # =============================================================================
 
+# MongoDB 환경변수 로깅
+MONGODB_HOST = os.getenv("MONGODB_HOST", "localhost")
+MONGODB_PORT = int(os.getenv("MONGODB_PORT", 27017))
+MONGODB_DATABASE = os.getenv("MONGODB_DATABASE", "devblog")
+MONGODB_USERNAME = os.getenv("MONGODB_USERNAME")
+MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD")
+
+print(f"🍃 MongoDB 설정:")
+print(f"📍 MONGODB_HOST: {MONGODB_HOST}")
+print(f"🔢 MONGODB_PORT: {MONGODB_PORT}")
+print(f"🗄️  MONGODB_DATABASE: {MONGODB_DATABASE}")
+print(f"👤 MONGODB_USERNAME: {MONGODB_USERNAME}")
+print(f"🔐 MONGODB_PASSWORD: {'***' if MONGODB_PASSWORD else 'None'}")
+
+if not MONGODB_USERNAME:
+    print("❌ MONGODB_USERNAME 환경변수가 설정되지 않았습니다!")
+if not MONGODB_PASSWORD:
+    print("❌ MONGODB_PASSWORD 환경변수가 설정되지 않았습니다!")
+
 MONGODB_SETTINGS = {
-    "host": os.getenv("MONGODB_HOST", "localhost"),
-    "port": int(os.getenv("MONGODB_PORT", 27017)),
-    "database": os.getenv("MONGODB_DATABASE", "devblog"),
-    "username": os.getenv("MONGODB_USERNAME"),
-    "password": os.getenv("MONGODB_PASSWORD"),
+    "host": MONGODB_HOST,
+    "port": MONGODB_PORT,
+    "database": MONGODB_DATABASE,
+    "username": MONGODB_USERNAME,
+    "password": MONGODB_PASSWORD,
     "auth_source": os.getenv("MONGODB_AUTH_SOURCE", "admin"),
     "direct_connection": os.getenv("MONGODB_DIRECT_CONNECTION", "true").lower()
     == "true",

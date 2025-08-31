@@ -23,11 +23,9 @@ class HealthService:
             Dict[str, Any]: 서비스 상태 정보
         """
         try:
-            # Elasticsearch 연결 상태 확인
-            elasticsearch_connected = self._check_elasticsearch_connection()
-
-            # MongoDB 연결 상태 확인
-            mongodb_connected = self._check_mongodb_connection()
+            # 빠른 연결 상태 확인 (타임아웃 단축)
+            elasticsearch_connected = self._check_elasticsearch_connection_fast()
+            mongodb_connected = self._check_mongodb_connection_fast()
 
             # 전체 상태 결정
             overall_status = (
@@ -60,6 +58,34 @@ class HealthService:
                 "version": "1.0.0",
                 "error": str(e),
             }
+
+    def _check_elasticsearch_connection_fast(self) -> bool:
+        """
+        Elasticsearch 연결 상태를 빠르게 확인합니다 (2초 타임아웃).
+        """
+        try:
+            from ..clients.elasticsearch_client import ElasticsearchClient
+            
+            # 빠른 타임아웃으로 클라이언트 생성
+            client = ElasticsearchClient(timeout=2)
+            return client.check_connection()
+        except Exception as e:
+            logger.warning(f"Elasticsearch connection check failed: {str(e)}")
+            return False
+
+    def _check_mongodb_connection_fast(self) -> bool:
+        """
+        MongoDB 연결 상태를 빠르게 확인합니다 (2초 타임아웃).
+        """
+        try:
+            from ..clients.mongodb_client import MongoDBClient
+            
+            # 빠른 타임아웃으로 클라이언트 생성
+            client = MongoDBClient(timeout=2)
+            return client.check_connection()
+        except Exception as e:
+            logger.warning(f"MongoDB connection check failed: {str(e)}")
+            return False
 
     def _check_elasticsearch_connection(self) -> bool:
         """

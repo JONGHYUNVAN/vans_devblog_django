@@ -25,4 +25,8 @@ urlpatterns = [
     path("autocomplete/", views.autocomplete, name="autocomplete"),
     path("popular/", views.popular_searches, name="popular-searches"),
     path("categories/", views.get_categories, name="get-categories"),
+    # 데이터 동기화 API
+    path("sync/status/", views.sync_status, name="sync-status"),
+    path("sync/", views.sync_data, name="sync-data"),
+    path("sync/all/", views.sync_all_data, name="sync-all-data"),
 ]

@@ -1,0 +1,78 @@
+# =============================================================================
+# Elasticsearch with Nori Plugin - Docker Compose Configuration
+# Django와 연동할 수 있는 Elasticsearch + Nori 플러그인 설정
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # Elasticsearch with Nori Plugin
+  elasticsearch-nori:
+    build:
+      context: .
+      dockerfile: Dockerfile.elasticsearch
+    container_name: vans_elasticsearch_nori
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - cluster.name=vans-search-cluster
+      - node.name=vans-search-node
+      # 한국어 분석 설정
+      - indices.query.bool.max_clause_count=8192
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - es_nori_data:/usr/share/elasticsearch/data
+      - ./elasticsearch-config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    networks:
+      - vans_search_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # Kibana for Elasticsearch Management (Optional)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.0
+    container_name: vans_kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch-nori:9200
+      - SERVER_NAME=kibana
+      - SERVER_HOST=0.0.0.0
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch-nori:
+        condition: service_healthy
+    networks:
+      - vans_search_network
+    restart: unless-stopped
+
+  # Elasticsearch Head Plugin (Alternative GUI)
+  elasticsearch-head:
+    image: mobz/elasticsearch-head:5
+    container_name: vans_es_head
+    ports:
+      - "9100:9100"
+    depends_on:
+      elasticsearch-nori:
+        condition: service_healthy
+    networks:
+      - vans_search_network
+    restart: unless-stopped
+
+volumes:
+  es_nori_data:
+    driver: local
+
+networks:
+  vans_search_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+

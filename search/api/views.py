@@ -6,6 +6,8 @@ API 엔드포인트를 정의하고 HTTP 요청/응답을 처리합니다.
 """
 
 import logging
+import time
+from datetime import datetime
 
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -16,15 +18,74 @@ from rest_framework.response import Response
 
 from ..services.health_service import HealthService
 from ..services.search_service import SearchService
+from ..services.sync_service import SyncService
 from .serializers import (
     AutocompleteRequestSerializer,
     AutocompleteResponseSerializer,
     PopularSearchesResponseSerializer,
     SearchRequestSerializer,
     SearchResponseSerializer,
+    SyncRequestSerializer,
+    SyncResponseSerializer,
+    SyncStatusSerializer,
 )
 
 logger = logging.getLogger("search")
+
+# API 로깅 데코레이터
+def api_logger(func):
+    """API 호출 로깅 데코레이터"""
+    def wrapper(*args, **kwargs):
+        request = args[0]  # request 객체
+        start_time = time.time()
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 요청 정보 로깅 (이모지 제거)
+        logger.info(f"[API 요청 시작] {func.__name__}")
+        logger.info(f"[시간] {timestamp}")
+        logger.info(f"[메서드] {request.method}")
+        logger.info(f"[경로] {request.path}")
+        logger.info(f"[쿼리] {dict(request.GET)}")
+        logger.info(f"[데이터] {getattr(request, 'data', {})}")
+        logger.info(f"[IP] {request.META.get('REMOTE_ADDR', 'Unknown')}")
+        logger.info(f"[User-Agent] {request.META.get('HTTP_USER_AGENT', 'Unknown')[:100]}")
+        
+        try:
+            # API 함수 실행
+            response = func(*args, **kwargs)
+            
+            # 응답 정보 로깅 (이모지 제거)
+            execution_time = time.time() - start_time
+            logger.info(f"[API 응답 성공] {func.__name__}")
+            logger.info(f"[상태 코드] {response.status_code}")
+            logger.info(f"[실행 시간] {execution_time:.3f}초")
+            
+            if hasattr(response, 'data') and isinstance(response.data, dict):
+                if 'count' in response.data:
+                    logger.info(f"[결과 수] {response.data['count']}")
+                if 'results' in response.data:
+                    logger.info(f"[반환 항목] {len(response.data['results'])}개")
+            
+            return response
+            
+        except Exception as e:
+            # 에러 정보 로깅 (이모지 제거)
+            execution_time = time.time() - start_time
+            logger.error(f"[API 에러 발생] {func.__name__}")
+            logger.error(f"[에러] {str(e)}")
+            logger.error(f"[실행 시간] {execution_time:.3f}초")
+            logger.error(f"[에러 타입] {type(e).__name__}")
+            
+            # 에러 응답 반환
+            return Response(
+                {
+                    "error": "search request failed",
+                    "message": "An error occurred while processing your search request. Please try again."
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    return wrapper
 
 
 @swagger_auto_schema(
@@ -48,6 +109,7 @@ logger = logging.getLogger("search")
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@api_logger
 def health_check(request):
     """
     서비스 상태를 확인하는 헬스체크 엔드포인트입니다.
@@ -88,6 +150,7 @@ def health_check(request):
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@api_logger
 def search_posts(request):
     """게시물을 검색하는 API 엔드포인트입니다."""
     try:
@@ -134,6 +197,7 @@ def search_posts(request):
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@api_logger
 def autocomplete(request):
     """검색어 자동완성 제안을 제공하는 API 엔드포인트입니다."""
     try:
@@ -180,6 +244,7 @@ def autocomplete(request):
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@api_logger
 def popular_searches(request):
     """인기 검색어 목록을 제공하는 API 엔드포인트입니다."""
     try:
@@ -236,6 +301,146 @@ def get_categories(request):
             {
                 "error": "Categories request failed",
                 "message": "An error occurred while getting categories. Please try again.",
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@swagger_auto_schema(
+    method="get",
+    operation_summary="동기화 상태 조회",
+    operation_description="MongoDB와 Elasticsearch 간의 데이터 동기화 상태를 조회합니다.",
+    responses={
+        200: SyncStatusSerializer,
+        500: openapi.Response(description="서버 오류"),
+    },
+    tags=["Data Sync"],
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+@api_logger
+def sync_status(request):
+    """동기화 상태를 조회하는 API 엔드포인트입니다."""
+    try:
+        sync_service = SyncService()
+        status_data = sync_service.get_sync_status()
+
+        logger.info(f"Sync status retrieved: {status_data}")
+        return Response(status_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Sync status failed: {str(e)}", exc_info=True)
+        return Response(
+            {
+                "error": "Sync status request failed",
+                "message": "동기화 상태 조회 중 오류가 발생했습니다. 다시 시도해주세요.",
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@swagger_auto_schema(
+    method="post",
+    operation_summary="데이터 동기화 실행",
+    operation_description="MongoDB에서 Elasticsearch로 게시물 데이터를 동기화합니다.",
+    request_body=SyncRequestSerializer,
+    responses={
+        200: SyncResponseSerializer,
+        400: openapi.Response(description="잘못된 요청"),
+        500: openapi.Response(description="서버 오류"),
+    },
+    tags=["Data Sync"],
+)
+@api_view(["POST"])
+@permission_classes([AllowAny])  # 실제로는 관리자 권한 필요할 수 있음
+@api_logger
+def sync_data(request):
+    """MongoDB에서 Elasticsearch로 데이터를 동기화하는 API 엔드포인트입니다."""
+    try:
+        # 요청 데이터 검증
+        serializer = SyncRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            logger.warning(f"Invalid sync request: {serializer.errors}")
+            return Response(
+                {"error": "Invalid request parameters", "details": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 동기화 실행
+        sync_service = SyncService()
+        sync_result = sync_service.sync_data(serializer.validated_data)
+
+        logger.info(f"Sync completed: {sync_result}")
+
+        # 응답 상태 결정
+        if sync_result["status"] == "completed":
+            response_status = status.HTTP_200_OK
+        elif sync_result["status"] == "partial":
+            response_status = status.HTTP_200_OK
+        else:
+            response_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+        return Response(sync_result, status=response_status)
+
+    except Exception as e:
+        logger.error(f"Sync failed: {str(e)}", exc_info=True)
+        return Response(
+            {
+                "error": "Sync request failed",
+                "message": "데이터 동기화 중 오류가 발생했습니다. 다시 시도해주세요.",
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@swagger_auto_schema(
+    method="post",
+    operation_summary="전체 데이터 동기화",
+    operation_description="MongoDB의 모든 발행된 게시물을 Elasticsearch로 동기화합니다.",
+    responses={
+        200: SyncResponseSerializer,
+        500: openapi.Response(description="서버 오류"),
+    },
+    tags=["Data Sync"],
+)
+@api_view(["POST"])
+@permission_classes([AllowAny])  # 실제로는 관리자 권한 필요할 수 있음
+@api_logger
+def sync_all_data(request):
+    """모든 데이터를 동기화하는 간편한 API 엔드포인트입니다."""
+    try:
+        # 전체 동기화 옵션 (is_published 필드가 없으므로 모든 게시물 동기화)
+        sync_options = {
+            "batch_size": 50,
+            "force_all": True,  # 모든 게시물 동기화
+            "incremental": False,
+            "days": 7,
+            "clear_existing": False,
+            "dry_run": False,
+        }
+
+        # 동기화 실행
+        sync_service = SyncService()
+        sync_result = sync_service.sync_data(sync_options)
+
+        logger.info(f"Full sync completed: {sync_result}")
+
+        # 응답 상태 결정
+        if sync_result["status"] == "completed":
+            response_status = status.HTTP_200_OK
+        elif sync_result["status"] == "partial":
+            response_status = status.HTTP_200_OK
+        else:
+            response_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+        return Response(sync_result, status=response_status)
+
+    except Exception as e:
+        logger.error(f"Full sync failed: {str(e)}", exc_info=True)
+        return Response(
+            {
+                "error": "Full sync request failed",
+                "message": "전체 데이터 동기화 중 오류가 발생했습니다. 다시 시도해주세요.",
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

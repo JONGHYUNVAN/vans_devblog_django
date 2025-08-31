@@ -80,7 +80,11 @@ API Documentation
 
 .. toctree::
    :maxdepth: 3
-   :caption: API Documentation:
+   :caption: Documentation:
    
+   quickstart
+   architecture
+   deployment
+   testing
    api
 

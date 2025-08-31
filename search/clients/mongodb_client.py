@@ -34,12 +34,15 @@ class MongoDBClient:
         >>> print(f"Found {len(posts)} published posts")
     """
 
-    def __init__(self):
+    def __init__(self, timeout: Optional[int] = None):
         """
         MongoDBClient 인스턴스를 초기화합니다.
 
         Django 설정에서 MongoDB 연결 정보를 가져와서
         클라이언트 연결을 설정합니다.
+
+        Args:
+            timeout (Optional[int]): 연결 타임아웃 (초)
 
         Raises:
             ConnectionFailure: MongoDB 서버에 연결할 수 없는 경우
@@ -63,12 +66,22 @@ class MongoDBClient:
                     f"{mongodb_settings['port']}/{mongodb_settings['database']}"
                 )
 
-            self.client = MongoClient(
-                connection_url,
-                serverSelectionTimeoutMS=10000,  # 10초 타임아웃 (클라우드 연결용)
-                connectTimeoutMS=10000,
-                socketTimeoutMS=20000,
-            )
+            # 타임아웃 설정
+            if timeout:
+                timeout_ms = timeout * 1000
+                client_options = {
+                    "serverSelectionTimeoutMS": timeout_ms,
+                    "connectTimeoutMS": timeout_ms,
+                    "socketTimeoutMS": timeout_ms,
+                }
+            else:
+                client_options = {
+                    "serverSelectionTimeoutMS": 10000,
+                    "connectTimeoutMS": 10000,
+                    "socketTimeoutMS": 20000,
+                }
+
+            self.client = MongoClient(connection_url, **client_options)
 
             # 데이터베이스 및 컬렉션 설정
             self.database = self.client[mongodb_settings["database"]]
@@ -139,7 +152,7 @@ class MongoDBClient:
             skip (int): 건너뛸 문서 수 (기본값: 0)
 
         Yields:
-            Dict[str, Any]: 게시물 문서
+            Dict[str, Any]: 원본 게시물 문서
 
         Example:
             >>> for post in mongo_client.get_all_published_posts():
@@ -148,10 +161,7 @@ class MongoDBClient:
         try:
             query = {"is_published": True}
             cursor = self.posts_collection.find(query).skip(skip).limit(batch_size)
-
-            for post in cursor:
-                yield self._format_post_document(post)
-
+            yield from cursor
         except Exception as e:
             logger.error(f"Failed to get published posts: {str(e)}")
             return
@@ -167,7 +177,7 @@ class MongoDBClient:
             skip (int): 건너뛸 문서 수 (기본값: 0)
 
         Yields:
-            Dict[str, Any]: 게시물 문서
+            Dict[str, Any]: 원본 게시물 문서
 
         Example:
             >>> for post in mongo_client.get_all_posts():
@@ -175,10 +185,7 @@ class MongoDBClient:
         """
         try:
             cursor = self.posts_collection.find({}).skip(skip).limit(batch_size)
-
-            for post in cursor:
-                yield self._format_post_document(post)
-
+            yield from cursor
         except Exception as e:
             logger.error(f"Failed to get all posts: {str(e)}")
             return
@@ -191,7 +198,7 @@ class MongoDBClient:
             post_ids (List[str]): 게시물 ID 목록
 
         Returns:
-            List[Dict[str, Any]]: 게시물 문서 목록
+            List[Dict[str, Any]]: 원본 게시물 문서 목록
 
         Example:
             >>> posts = mongo_client.get_posts_by_ids([
@@ -204,14 +211,9 @@ class MongoDBClient:
                 ObjectId(post_id) for post_id in post_ids if ObjectId.is_valid(post_id)
             ]
             query = {"_id": {"$in": object_ids}}
-
-            posts = []
-            for post in self.posts_collection.find(query):
-                posts.append(self._format_post_document(post))
-
+            posts = list(self.posts_collection.find(query))
             logger.debug(f"Retrieved {len(posts)} posts by IDs")
             return posts
-
         except Exception as e:
             logger.error(f"Failed to get posts by IDs: {str(e)}")
             return []
@@ -224,7 +226,7 @@ class MongoDBClient:
             post_id (str): 게시물 ID
 
         Returns:
-            Optional[Dict[str, Any]]: 게시물 문서 또는 None
+            Optional[Dict[str, Any]]: 원본 게시물 문서 또는 None
 
         Example:
             >>> post = mongo_client.get_post_by_id("507f1f77bcf86cd799439011")
@@ -235,14 +237,7 @@ class MongoDBClient:
             if not ObjectId.is_valid(post_id):
                 logger.warning(f"Invalid ObjectId: {post_id}")
                 return None
-
-            post = self.posts_collection.find_one({"_id": ObjectId(post_id)})
-            if post:
-                return self._format_post_document(post)
-
-            logger.debug(f"Post not found: {post_id}")
-            return None
-
+            return self.posts_collection.find_one({"_id": ObjectId(post_id)})
         except Exception as e:
             logger.error(f"Failed to get post by ID {post_id}: {str(e)}")
             return None
@@ -258,7 +253,7 @@ class MongoDBClient:
             batch_size (int): 배치 크기
 
         Yields:
-            Dict[str, Any]: 게시물 문서
+            Dict[str, Any]: 원본 게시물 문서
 
         Example:
             >>> from datetime import datetime, timedelta
@@ -273,12 +268,8 @@ class MongoDBClient:
                     {"published_date": {"$gte": since_date}},
                 ]
             }
-
             cursor = self.posts_collection.find(query).limit(batch_size)
-
-            for post in cursor:
-                yield self._format_post_document(post)
-
+            yield from cursor
         except Exception as e:
             logger.error(f"Failed to get posts updated since {since_date}: {str(e)}")
             return
@@ -370,52 +361,6 @@ class MongoDBClient:
                 query["published_date"] = date_query
 
         return query
-
-    def _format_post_document(self, post: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        MongoDB 문서를 Elasticsearch 형식으로 변환합니다.
-
-        Args:
-            post (Dict[str, Any]): MongoDB 게시물 문서
-
-        Returns:
-            Dict[str, Any]: 포맷된 게시물 문서
-        """
-        try:
-            # ObjectId를 문자열로 변환
-            if "_id" in post:
-                post["_id"] = str(post["_id"])
-
-            # 작성자 정보 포맷팅
-            if "author" in post and isinstance(post["author"], dict):
-                if "_id" in post["author"]:
-                    post["author"]["_id"] = str(post["author"]["_id"])
-
-            # 날짜 필드 확인 및 기본값 설정
-            current_time = datetime.utcnow()
-            if not post.get("published_date"):
-                post["published_date"] = current_time
-            if not post.get("updated_date"):
-                post["updated_date"] = current_time
-
-            # 기본값 설정
-            post.setdefault("view_count", 0)
-            post.setdefault("like_count", 0)
-            post.setdefault("comment_count", 0)
-            post.setdefault("is_published", False)
-            post.setdefault("tags", [])
-            post.setdefault("category", "")
-            post.setdefault("summary", "")
-            post.setdefault("slug", "")
-            post.setdefault("featured_image", "")
-            post.setdefault("meta_description", "")
-            post.setdefault("search_boost", 1.0)
-
-            return post
-
-        except Exception as e:
-            logger.error(f"Failed to format post document: {str(e)}")
-            return post
 
     def close(self):
         """

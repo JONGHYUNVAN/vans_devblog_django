@@ -20,16 +20,17 @@ from .base import (
 DEBUG = False
 
 # CloudType.io 도메인 허용
-ALLOWED_HOSTS = (
-    [
-        "*.cloudtype.app",
-        "localhost",
-        "127.0.0.1",
-    ]
-    + get_env_variable("ALLOWED_HOSTS", "").split(",")
-    if get_env_variable("ALLOWED_HOSTS")
-    else []
-)
+allowed_hosts_env = get_env_variable("ALLOWED_HOSTS", "")
+ALLOWED_HOSTS = [
+    "*.cloudtype.app",
+    "localhost", 
+    "127.0.0.1",
+]
+
+# 환경변수에서 추가 호스트 설정
+if allowed_hosts_env:
+    additional_hosts = [host.strip() for host in allowed_hosts_env.split(",") if host.strip()]
+    ALLOWED_HOSTS.extend(additional_hosts)
 
 # CSRF 설정 (CloudType.io 도메인 포함)
 CSRF_TRUSTED_ORIGINS = [
@@ -42,8 +43,28 @@ CSRF_TRUSTED_ORIGINS = [
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "https://*.cloudtype.app",
+    "http://localhost:3000",  # React 개발 서버
+    "http://localhost:8080",  # Vue 개발 서버
 ]
+
+# 환경변수에서 추가 CORS 도메인 설정
+cors_origins_env = get_env_variable("CORS_ALLOWED_ORIGINS", "")
+if cors_origins_env:
+    additional_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+    CORS_ALLOWED_ORIGINS.extend(additional_origins)
+
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 # =============================================================================
 # DATABASE SETTINGS (CloudType.io)
@@ -147,10 +168,12 @@ ELASTICSEARCH_PORT = get_env_variable("ELASTICSEARCH_PORT", "9200")
 ELASTICSEARCH_USERNAME = get_env_variable("ELASTICSEARCH_USERNAME", "")
 ELASTICSEARCH_PASSWORD = get_env_variable("ELASTICSEARCH_PASSWORD", "")
 
-# Elasticsearch DSL 설정
+# Elasticsearch DSL 설정 (Nori 플러그인 포함)
 es_config = {
     "hosts": [f"{ELASTICSEARCH_HOST}:{ELASTICSEARCH_PORT}"],
     "timeout": 20,
+    "verify_certs": False,  # CloudType.io SSL 설정에 따라 조정
+    "ssl_show_warn": False,
 }
 
 # 인증이 필요한 경우
@@ -159,6 +182,58 @@ if ELASTICSEARCH_USERNAME and ELASTICSEARCH_PASSWORD:
 
 ELASTICSEARCH_DSL = {
     "default": es_config,
+}
+
+# 한국어 검색을 위한 Nori 분석기 설정
+ELASTICSEARCH_INDEX_SETTINGS = {
+    "analysis": {
+        "analyzer": {
+            "korean_analyzer": {
+                "type": "custom",
+                "tokenizer": "nori_tokenizer",
+                "decompound_mode": "mixed",
+                "filter": [
+                    "lowercase",
+                    "nori_part_of_speech",
+                    "nori_readingform",
+                    "cjk_width"
+                ]
+            },
+            "korean_search_analyzer": {
+                "type": "custom", 
+                "tokenizer": "nori_tokenizer",
+                "decompound_mode": "none",
+                "filter": [
+                    "lowercase",
+                    "nori_part_of_speech", 
+                    "nori_readingform",
+                    "cjk_width"
+                ]
+            }
+        },
+        "tokenizer": {
+            "nori_tokenizer": {
+                "type": "nori_tokenizer",
+                "decompound_mode": "mixed",
+                "discard_punctuation": True,
+                "user_dictionary_rules": [
+                    "Django => Django",
+                    "ElasticSearch => ElasticSearch", 
+                    "CloudType => CloudType"
+                ]
+            }
+        },
+        "filter": {
+            "nori_part_of_speech": {
+                "type": "nori_part_of_speech",
+                "stoptags": [
+                    "E", "IC", "J", "MAG", "MAJ", "MM", "SP", 
+                    "SSC", "SSO", "SC", "SE", "XPN", "XSA", 
+                    "XSN", "XSV", "UNA", "NA", "VSV"
+                ]
+            }
+        }
+    }
 }
 
 # =============================================================================
@@ -180,14 +255,25 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = False  # CloudType.io에서 자동 처리
 USE_TLS = True
 
+# 보안 헤더 설정
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_HSTS_SECONDS = 31536000  # 1년
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+
 # Session 보안
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_AGE = 86400  # 24시간
+SESSION_COOKIE_SAMESITE = 'Lax'
 
 # CSRF 보안
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_USE_SESSIONS = True
 
 # =============================================================================
 # PERFORMANCE SETTINGS

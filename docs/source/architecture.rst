@@ -19,6 +19,15 @@ VansDevBlog Search Service는 마이크로서비스 아키텍처를 따릅니다
     │   (Metadata)    │◀───┤                 │◀───┤   (Search)      │
     └─────────────────┘    └─────────────────┘    └─────────────────┘
 
+기술 스택
+---------
+
+* **Backend**: Django 5.1+ & Django REST Framework
+* **Search Engine**: Elasticsearch 8.x with Nori (Korean) Analyzer
+* **Caching**: Django LocMemCache (or Redis in production)
+* **Database**: Inherits MariaDB & MongoDB from existing services
+* **API Docs**: drf-yasg (Swagger/OpenAPI)
+
 주요 컴포넌트
 -----------
 
@@ -59,6 +68,52 @@ Data Storage
 4. **결과 집계**: 검색 결과와 메타데이터 결합
 5. **캐시 저장**: 결과를 Redis에 저장
 6. **응답 반환**: JSON 형태로 결과 반환
+
+폴더 구조
+----------
+
+.. code-block:: text
+
+    vans_devblog_django/
+    ├── .git/
+    ├── docs/
+    │   └── source/
+    │       ├── _static/
+    │       ├── _templates/
+    │       ├── api.rst
+    │       ├── architecture.rst
+    │       ├── conf.py
+    │       └── index.rst
+    ├── scripts/
+    │   ├── cloudtype_health_check.py
+    │   └── run_tests.py
+    ├── search/
+    │   ├── api/
+    │   ├── clients/
+    │   ├── documents/
+    │   ├── management/
+    │   ├── services/
+    │   ├── migrations/
+    │   ├── __init__.py
+    │   ├── models.py
+    │   └── ...
+    ├── tests/
+    │   ├── __init__.py
+    │   ├── conftest.py
+    │   └── test_*.py
+    ├── vans_search_service/
+    │   ├── settings/
+    │   │   ├── base.py
+    │   │   ├── development.py
+    │   │   └── ...
+    │   ├── __init__.py
+    │   ├── urls.py
+    │   └── ...
+    ├── .gitignore
+    ├── manage.py
+    ├── requirements.txt
+    └── README.md
+
 
 확장성
 ------

@@ -9,7 +9,7 @@ import logging
 from django.core.management.base import BaseCommand, CommandError
 
 from search.documents import create_indexes, delete_indexes, rebuild_indexes
-from search.utils.elasticsearch_client import ElasticsearchClient
+from search.clients.elasticsearch_client import ElasticsearchClient
 
 logger = logging.getLogger("search")
 
@@ -133,7 +133,7 @@ class Command(BaseCommand):
                 health = es_client.get_cluster_health()
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"✅ Elasticsearch 연결 성공! "
+                        f"Elasticsearch 연결 성공! "
                         f'(상태: {health.get("status", "unknown")})'
                     )
                 )
@@ -152,7 +152,7 @@ class Command(BaseCommand):
             CommandError: 인덱스 생성 실패
         """
         try:
-            self.stdout.write("🔧 Elasticsearch 인덱스 생성 중...")
+            self.stdout.write("Elasticsearch 인덱스 생성 중...")
 
             create_indexes()
 
@@ -175,7 +175,7 @@ class Command(BaseCommand):
         try:
             # 사용자 확인
             self.stdout.write(
-                self.style.WARNING("⚠️  모든 검색 인덱스가 삭제됩니다. 계속하시겠습니까? [y/N]: "), ending=""
+                self.style.WARNING("모든 검색 인덱스가 삭제됩니다. 계속하시겠습니까? [y/N]: "), ending=""
             )
 
             confirm = input().lower().strip()
@@ -183,11 +183,11 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS("인덱스 삭제가 취소되었습니다."))
                 return
 
-            self.stdout.write("🗑️  Elasticsearch 인덱스 삭제 중...")
+            self.stdout.write("Elasticsearch 인덱스 삭제 중...")
 
             delete_indexes()
 
-            self.stdout.write(self.style.SUCCESS("✅ 모든 인덱스가 성공적으로 삭제되었습니다!"))
+            self.stdout.write(self.style.SUCCESS("모든 인덱스가 성공적으로 삭제되었습니다!"))
 
         except Exception as e:
             logger.error(f"Index deletion failed: {str(e)}")
@@ -203,7 +203,7 @@ class Command(BaseCommand):
         try:
             # 사용자 확인
             self.stdout.write(
-                self.style.WARNING("⚠️  모든 검색 인덱스가 삭제되고 재생성됩니다. 계속하시겠습니까? [y/N]: "),
+                self.style.WARNING("모든 검색 인덱스가 삭제되고 재생성됩니다. 계속하시겠습니까? [y/N]: "),
                 ending="",
             )
 
@@ -212,7 +212,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS("인덱스 재구축이 취소되었습니다."))
                 return
 
-            self.stdout.write("🔄 Elasticsearch 인덱스 재구축 중...")
+            self.stdout.write("Elasticsearch 인덱스 재구축 중...")
 
             rebuild_indexes()
 

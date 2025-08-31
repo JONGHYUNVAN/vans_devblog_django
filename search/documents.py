@@ -33,13 +33,14 @@ logger = logging.getLogger("search")
 def setup_elasticsearch_connection():
     """Elasticsearch 연결을 설정합니다."""
     try:
+        es_config = settings.ELASTICSEARCH_DSL["default"]
         connections.create_connection(
-            hosts=settings.ELASTICSEARCH_DSL["default"]["hosts"],
-            timeout=settings.ELASTICSEARCH_DSL["default"].get("timeout", 20),
-            max_retries=settings.ELASTICSEARCH_DSL["default"].get("max_retries", 3),
-            retry_on_timeout=settings.ELASTICSEARCH_DSL["default"].get(
-                "retry_on_timeout", True
-            ),
+            hosts=es_config["hosts"],
+            timeout=es_config.get("timeout", 20),
+            max_retries=es_config.get("max_retries", 3),
+            retry_on_timeout=es_config.get("retry_on_timeout", True),
+            verify_certs=es_config.get("verify_certs", True),
+            http_auth=es_config.get("http_auth"),
         )
         logger.info("Elasticsearch connection established")
     except Exception as e:
@@ -396,7 +397,7 @@ class PostDocument(Document):
                 category=mongo_post.get("category", ""),
                 tags=mongo_post.get("tags", []),
                 author=author,
-                published_date=mongo_post.get("published_date"),
+                # published_date=mongo_post.get("published_date"),  # 제거됨
                 updated_date=mongo_post.get("updated_date"),
                 view_count=mongo_post.get("view_count", 0),
                 like_count=mongo_post.get("like_count", 0),

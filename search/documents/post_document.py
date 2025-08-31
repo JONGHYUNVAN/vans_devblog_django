@@ -41,12 +41,9 @@ class PostDocument(Document):
         category (str): 카테고리 (키워드 검색)
         tags (List[str]): 태그 목록
         author (Dict): 작성자 정보
-        published_date (datetime): 발행일
         updated_date (datetime): 수정일
         view_count (int): 조회수
-        like_count (int): 좋아요 수
         comment_count (int): 댓글 수
-        is_published (bool): 발행 여부
         language (str): 언어 코드 (ko, en)
         reading_time (int): 예상 읽기 시간 (분)
         featured_image (str): 대표 이미지 URL
@@ -94,44 +91,41 @@ class PostDocument(Document):
     # URL 슬러그
     slug = Keyword()
 
-    # 테마 - 키워드 검색 (카테고리 상위 개념)
-    theme = Keyword(fields={"text": Text(analyzer="keyword")})
+    # 주제 - 키워드 검색 (카테고리 상위 개념)
+    topic = Keyword(fields={"text": Text(analyzer="keyword")})
 
     # 카테고리 - 키워드 검색
     category = Keyword(fields={"text": Text(analyzer="keyword")})
 
+    # 설명
+    description = Text(
+        analyzer=korean_analyzer, fields={"english": Text(analyzer=english_analyzer)}
+    )
+
     # 태그 - 배열 키워드
     tags = Keyword(multi=True, fields={"suggest": Completion()})
 
-    # 작성자 정보
-    author = Object(
-        properties={
-            "user_id": Keyword(),
-            "username": Keyword(),
-            "display_name": Text(analyzer="keyword"),
-            "profile_image": Keyword(),
-        }
-    )
+    # 작성자 이메일
+    author_email = Keyword()
 
     # 날짜 필드
-    published_date = Date()
     updated_date = Date()
 
     # 통계 필드
     view_count = Integer()
     like_count = Integer()
-    comment_count = Integer()
 
-    # 상태 필드
-    is_published = Boolean()
+    # 테마
+    theme = Keyword(fields={"text": Text(analyzer="keyword")})
 
     # 언어 코드
     language = Keyword()
 
+    # 썸네일 이미지
+    thumbnail = Keyword()
+
     # 기타 메타데이터
     reading_time = Integer()
-    featured_image = Keyword()
-    meta_description = Text(analyzer=korean_analyzer)
     search_boost = Float()
 
     class Index:
@@ -176,50 +170,50 @@ class PostDocument(Document):
             # MongoDB ObjectId를 문자열로 변환
             post_id = str(mongo_post.get("_id", ""))
 
-            # 작성자 정보 추출
-            author_data = mongo_post.get("author", {})
-            author = {
-                "user_id": str(author_data.get("_id", "")),
-                "username": author_data.get("username", ""),
-                "display_name": author_data.get("display_name", ""),
-                "profile_image": author_data.get("profile_image", ""),
-            }
-
+            # 제목과 내용 추출 및 문자열 변환
+            title = str(mongo_post.get("title", ""))
+            content_raw = mongo_post.get("content", "")
+            
+            # content가 dict/object인 경우 문자열로 변환
+            if isinstance(content_raw, dict):
+                content = str(content_raw)
+            elif isinstance(content_raw, str):
+                content = content_raw
+            else:
+                content = str(content_raw)
+            
             # 언어 감지 (한국어 포함 여부로 판단)
-            title = mongo_post.get("title", "")
-            content = mongo_post.get("content", "")
             language = (
                 "ko"
                 if any("\uAC00" <= char <= "\uD7A3" for char in title + content)
                 else "en"
             )
 
-            # 읽기 시간 계산 (단어 수 기준)
-            word_count = len(content.split())
-            reading_time = max(1, word_count // 200)  # 분당 200단어 기준
+            # 읽기 시간 계산 (단어 수 기준) - 문자열만 처리
+            try:
+                word_count = len(content.split()) if content else 0
+                reading_time = max(1, word_count // 200)  # 분당 200단어 기준
+            except:
+                reading_time = 1
 
             return cls(
                 meta={"id": post_id},
                 post_id=post_id,
                 title=title,
                 content=content,
-                summary=mongo_post.get("summary", ""),
-                slug=mongo_post.get("slug", ""),
-                theme=mongo_post.get("theme", ""),
+                description=mongo_post.get("description", ""),
+                topic=mongo_post.get("topic", ""),
                 category=mongo_post.get("category", ""),
                 tags=mongo_post.get("tags", []),
-                author=author,
-                published_date=mongo_post.get("published_date"),
-                updated_date=mongo_post.get("updated_date"),
-                view_count=mongo_post.get("view_count", 0),
-                like_count=mongo_post.get("like_count", 0),
-                comment_count=mongo_post.get("comment_count", 0),
-                is_published=mongo_post.get("is_published", False),
-                language=language,
+                author_email=mongo_post.get("authorEmail", ""),
+                updated_date=mongo_post.get("updatedAt", mongo_post.get("updated_date")),
+                view_count=mongo_post.get("viewCount", 0),
+                like_count=mongo_post.get("likeCount", 0),
+                theme=mongo_post.get("theme", ""),
+                language=mongo_post.get("language", "ko"),
+                thumbnail=mongo_post.get("thumbnail", ""),
                 reading_time=reading_time,
-                featured_image=mongo_post.get("featured_image", ""),
-                meta_description=mongo_post.get("meta_description", ""),
-                search_boost=mongo_post.get("search_boost", 1.0),
+                search_boost=1.0,
             )
 
         except Exception as e:
@@ -236,16 +230,13 @@ class PostDocument(Document):
         return {
             "post_id": self.post_id,
             "title": self.title,
-            "summary": self.summary,
+            "description": self.description,
+            "topic": self.topic,
             "category": self.category,
             "tags": self.tags,
-            "author": {
-                "username": self.author.username if self.author else "",
-                "display_name": self.author.display_name if self.author else "",
-            },
-            "published_date": self.published_date,
+            "author_email": self.author_email,
             "view_count": self.view_count,
             "like_count": self.like_count,
             "reading_time": self.reading_time,
-            "featured_image": self.featured_image,
+            "thumbnail": self.thumbnail,
         }

@@ -1,0 +1,104 @@
+# =============================================================================
+# Elasticsearch Configuration for Korean Language Processing
+# Nori 플러그인을 활용한 한국어 검색 최적화 설정
+# =============================================================================
+
+# 클러스터 설정
+cluster.name: vans-search-cluster
+node.name: vans-search-node
+
+# 네트워크 설정
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+# 발견 설정 (단일 노드)
+discovery.type: single-node
+
+# 보안 설정 비활성화 (개발/테스트용)
+xpack.security.enabled: false
+xpack.ml.enabled: false
+xpack.graph.enabled: false
+xpack.watcher.enabled: false
+
+# 메모리 설정
+bootstrap.memory_lock: false
+
+# 로그 설정
+logger.level: INFO
+
+# 인덱스 설정
+action.auto_create_index: true
+action.destructive_requires_name: false
+
+# 한국어 분석 기본 설정
+index:
+  analysis:
+    analyzer:
+      korean_analyzer:
+        type: custom
+        tokenizer: nori_tokenizer
+        decompound_mode: mixed
+        filter:
+          - lowercase
+          - nori_part_of_speech
+          - nori_readingform
+          - cjk_width
+      
+      korean_search_analyzer:
+        type: custom
+        tokenizer: nori_tokenizer
+        decompound_mode: none
+        filter:
+          - lowercase
+          - nori_part_of_speech
+          - nori_readingform
+          - cjk_width
+
+    tokenizer:
+      nori_tokenizer:
+        type: nori_tokenizer
+        decompound_mode: mixed
+        discard_punctuation: true
+        user_dictionary_rules:
+          - "Django => Django"
+          - "ElasticSearch => ElasticSearch"
+          - "CloudType => CloudType"
+
+    filter:
+      nori_part_of_speech:
+        type: nori_part_of_speech
+        stoptags:
+          - E    # 어미
+          - IC   # 감탄사
+          - J    # 조사
+          - MAG  # 일반 부사
+          - MAJ  # 접속 부사
+          - MM   # 관형사
+          - SP   # 공백
+          - SSC  # 닫는 괄호
+          - SSO  # 여는 괄호
+          - SC   # 구분자
+          - SE   # 줄임표
+          - XPN  # 접두사
+          - XSA  # 형용사 파생 접미사
+          - XSN  # 명사 파생 접미사
+          - XSV  # 동사 파생 접미사
+          - UNA  # 분석 불능
+          - NA   # 분석 불능
+          - VSV  # 불규칙 활용
+
+      nori_readingform:
+        type: nori_readingform
+
+# 쿼리 최적화
+indices.query.bool.max_clause_count: 8192
+
+# 검색 성능 최적화
+search.max_buckets: 65536
+indices.fielddata.cache.size: 20%
+indices.requests.cache.size: 2%
+
+# 힙 덤프 방지
+path.repo: ["/usr/share/elasticsearch/backup"]
+

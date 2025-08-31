@@ -50,6 +50,33 @@ graph TB
 
 ##  빠른 시작
 
+### 🚀 VS Code에서 F5로 바로 실행하기
+
+**가장 간단한 방법:**
+1. VS Code에서 프로젝트 폴더 열기
+2. `F5` 키 누르기 → Django 개발서버 자동 시작! 🎉
+3. 브라우저에서 `http://localhost:8000` 접속
+
+**또는 배치파일로 실행:**
+```bash
+# Windows
+run_dev_server.bat
+
+# 또는 직접 실행
+python manage.py runserver 8000
+```
+
+### 🎯 VS Code 단축키
+
+| 키 | 동작 |
+|---|---|
+| `F5` | Django 개발서버 시작 |
+| `Shift+F5` | 서버 중지 |
+| `F6` | 데이터베이스 마이그레이션 |
+| `F7` | 전체 테스트 실행 |
+| `F8` | 헬스체크 실행 |
+| `Ctrl+Shift+D` | Docker 서비스 시작 |
+
 ### 1. 환경 설정
 
 ```bash
@@ -63,7 +90,7 @@ venv\\Scripts\\activate  # Windows
 # source venv/bin/activate  # macOS/Linux
 
 # 의존성 설치
-pip install -r requirements-minimal.txt
+pip install -r requirements/development.txt
 ```
 
 ### 2. 환경 변수 설정

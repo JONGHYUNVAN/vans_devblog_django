@@ -6,9 +6,7 @@ VansDevBlog Search Service Development Settings
 
 import logging.config
 
-from .base import (
-    BASE_DIR,
-)
+from .base import *  # 모든 기본 설정 import
 
 # =============================================================================
 # DEBUG SETTINGS
@@ -44,6 +42,23 @@ INTERNAL_IPS = [
 # =============================================================================
 # LOGGING CONFIGURATION (개발용)
 # =============================================================================
+
+# Elasticsearch 개발 환경 설정 (CloudType 전용)
+ELASTICSEARCH_HOST = get_env_variable("ELASTICSEARCH_HOST", "web-elasticsearch-m7fb3ua7b5f728d5.sel4.cloudtype.app:9200")
+ELASTICSEARCH_USERNAME = get_env_variable("ELASTICSEARCH_USERNAME", "elastic")
+ELASTICSEARCH_PASSWORD = get_env_variable("ELASTICSEARCH_PASSWORD", "VANSDEVBLOG")
+
+# CloudType Elasticsearch 전용 설정
+es_config = {
+    "hosts": [f"https://{ELASTICSEARCH_HOST}"],
+    "timeout": 30,
+    "verify_certs": False,  # 개발환경에서는 SSL 인증서 검증 비활성화
+    "http_auth": (ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD),
+}
+
+ELASTICSEARCH_DSL = {
+    "default": es_config,
+}
 
 LOGGING = {
     "version": 1,
@@ -85,6 +100,21 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "django.db.backends": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "django.db.backends.schema": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "django.utils.autoreload": {
+            "handlers": [],
+            "level": "WARNING",
+            "propagate": False,
+        },
         "search": {
             "handlers": ["console", "file"],
             "level": "DEBUG",
@@ -92,7 +122,17 @@ LOGGING = {
         },
         "elasticsearch": {
             "handlers": ["console", "file"],
-            "level": "WARNING",
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "elastic_transport": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "search.clients": {
+            "handlers": ["console"],
+            "level": "DEBUG",
             "propagate": False,
         },
     },
