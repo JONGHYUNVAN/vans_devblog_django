@@ -87,19 +87,13 @@ CORS_ALLOW_HEADERS = [
 # DATABASE SETTINGS (CloudType.io)
 # =============================================================================
 
-# CloudType.io에서 제공하는 PostgreSQL 사용
-if get_env_variable("DATABASE_URL", None):
-    import dj_database_url
-
-    DATABASES["default"] = dj_database_url.parse(get_env_variable("DATABASE_URL"))
-else:
-    # 기본값으로 SQLite 사용 (개발/테스트용)
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
+# MongoDB와 Elasticsearch만 사용하므로 SQLite로 간단히 설정
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
+}
 
 # =============================================================================
 # STATIC FILES (CloudType.io)
