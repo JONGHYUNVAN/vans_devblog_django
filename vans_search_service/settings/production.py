@@ -16,8 +16,8 @@ from .base import *  # 모든 기본 설정 import
 DEBUG = False
 
 ALLOWED_HOSTS = [
-    "*.cloudtype.app",
-    "*.sel4.cloudtype.app",
+    ".cloudtype.app",
+    ".sel4.cloudtype.app",
 ]
 
 # Add internal IP for health checks in cloud environments
