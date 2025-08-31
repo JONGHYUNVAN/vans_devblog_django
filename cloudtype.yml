@@ -15,7 +15,7 @@ build:
   # 빌드 단계에서 실행할 명령어
   commands:
     - pip install --upgrade pip
-    - pip install -r requirements-cloudtype.txt
+    - pip install -r requirements.txt
 
   # 빌드 환경 변수
   environment:
