@@ -17,6 +17,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = [
     "*.cloudtype.app",
+    "*.sel4.cloudtype.app",
 ]
 
 # Add internal IP for health checks in cloud environments
