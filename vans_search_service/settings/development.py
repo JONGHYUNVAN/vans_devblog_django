@@ -15,7 +15,9 @@ from .base import *  # 모든 기본 설정 import
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "*.cloudtype.app",
+]
 
 # Add internal IP for health checks in cloud environments
 try:
