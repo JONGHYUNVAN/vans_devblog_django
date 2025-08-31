@@ -25,6 +25,7 @@ ALLOWED_HOSTS = [
     "*.cloudtype.app",
     "localhost", 
     "127.0.0.1",
+    "10.88.28.16",
 ]
 
 # 환경변수에서 추가 호스트 설정
