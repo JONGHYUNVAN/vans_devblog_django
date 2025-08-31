@@ -5,8 +5,10 @@ VansDevBlog Search Service Production Settings
 """
 
 import logging.config
-
+import os
 import socket
+from pathlib import Path
+
 from .base import *  # 모든 기본 설정 import
 
 # =============================================================================
@@ -45,10 +47,10 @@ SECURE_HSTS_SECONDS = 31536000  # 1년
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_BROWSER_XSS_FILTER = True
+SECURE_BROWSER_XSS_FILTER = True  # (신규 Django에선 의미 거의 없음)
 X_FRAME_OPTIONS = "DENY"
 
-# CSRF 설정
+# CSRF 설정 (Django 4.1+에서 와일드카드 지원)
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = True
 CSRF_TRUSTED_ORIGINS = [
@@ -66,15 +68,20 @@ SESSION_COOKIE_AGE = 86400  # 24시간
 # =============================================================================
 
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = [
-    "https://*.cloudtype.app",
-    "https://*.sel4.cloudtype.app",
+# 와일드카드는 CORS_ALLOWED_ORIGINS에서 동작하지 않으므로 정규식으로 처리
+CORS_ALLOWED_ORIGINS = []
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://[a-z0-9.-]+\.cloudtype\.app$",
+    r"^https://[a-z0-9.-]+\.sel4\.cloudtype\.app$",
 ]
 
 # 환경변수에서 추가 프론트엔드 호스트 설정
 frontend_hosts = get_env_variable("FRONTEND_HOSTS", "").split(",")
 if frontend_hosts and frontend_hosts[0]:
-    CORS_ALLOWED_ORIGINS.extend([f"https://{host.strip()}" for host in frontend_hosts if host.strip()])
+    # 명시적 호스트는 정확 문자열로 추가
+    CORS_ALLOWED_ORIGINS.extend(
+        [f"https://{host.strip()}" for host in frontend_hosts if host.strip()]
+    )
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -97,15 +104,35 @@ DATABASES = {
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
-# WhiteNoise 설정 (정적 파일 서빙)
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# 디렉터리 보장 (경고/오류 방지)
+Path(STATIC_ROOT).mkdir(parents=True, exist_ok=True)
 
-# WhiteNoise 미들웨어 추가
-MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+# WhiteNoise 설정 (정적 파일 서빙)
+# - Manifest 기반(권장). 반드시 collectstatic을 릴리즈 단계에서 실행하세요.
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# 만약 manifest 누락 시 ValueError로 죽지 않게 임시 안전망 (장기적으론 collectstatic 필수)
+WHITENOISE_MANIFEST_STRICT = False
+
+# WhiteNoise 미들웨어를 SecurityMiddleware 바로 뒤에 안전하게 배치
+_mw = list(MIDDLEWARE)
+if "whitenoise.middleware.WhiteNoiseMiddleware" not in _mw:
+    try:
+        sec_idx = _mw.index("django.middleware.security.SecurityMiddleware")
+    except ValueError:
+        # base에서 빠졌다면 최상단에 Security/WhiteNoise를 보강
+        _mw.insert(0, "django.middleware.security.SecurityMiddleware")
+        _mw.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+    else:
+        _mw.insert(sec_idx + 1, "whitenoise.middleware.WhiteNoiseMiddleware")
+MIDDLEWARE = tuple(_mw)
 
 # =============================================================================
 # LOGGING CONFIGURATION (운영용)
 # =============================================================================
+
+# 로그 디렉터리 보장
+LOG_DIR = Path(BASE_DIR) / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Elasticsearch 운영 환경 설정
 ELASTICSEARCH_HOST = get_env_variable("ELASTICSEARCH_HOST", "localhost:9200")
@@ -113,6 +140,7 @@ ELASTICSEARCH_USERNAME = get_env_variable("ELASTICSEARCH_USERNAME", "elastic")
 ELASTICSEARCH_PASSWORD = get_env_variable("ELASTICSEARCH_PASSWORD", "")
 
 # 운영 환경 Elasticsearch 설정
+# (현재 연결 정상 동작 중이므로 기존 http_auth 유지)
 es_config = {
     "hosts": [f"https://{ELASTICSEARCH_HOST}"],
     "timeout": 30,
@@ -146,7 +174,7 @@ LOGGING = {
         "file": {
             "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": BASE_DIR / "logs" / "production.log",
+            "filename": LOG_DIR / "production.log",
             "maxBytes": 1024 * 1024 * 10,  # 10MB
             "backupCount": 5,
             "formatter": "verbose",
