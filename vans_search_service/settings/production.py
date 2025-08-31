@@ -38,8 +38,8 @@ if additional_hosts and additional_hosts[0]:
 # SECURITY SETTINGS (운영용)
 # =============================================================================
 
-# HTTPS 설정
-SECURE_SSL_REDIRECT = True
+# HTTPS 설정 (CloudType에서는 비활성화)
+SECURE_SSL_REDIRECT = False  # CloudType에서는 자동으로 HTTPS 처리됨
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_HSTS_SECONDS = 31536000  # 1년
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
@@ -52,8 +52,8 @@ X_FRAME_OPTIONS = "DENY"
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = True
 CSRF_TRUSTED_ORIGINS = [
-    f"https://{host}"
-    for host in get_env_variable("ALLOWED_HOSTS", "localhost").split(",")
+    "https://*.cloudtype.app",
+    "https://*.sel4.cloudtype.app",
 ]
 
 # Session 설정
