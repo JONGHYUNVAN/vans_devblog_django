@@ -240,30 +240,33 @@ class SearchRequestSerializer(serializers.Serializer):
         return attrs
 
 
-class SearchResultSerializer(serializers.Serializer):
+class SearchResultSerializer(PostDocumentSerializer):
     """
     검색 결과 시리얼라이저.
 
-    검색 API 응답을 직렬화합니다.
-
-    Attributes:
-        id (str): 문서 ID
-        score (float): 검색 점수
-        source (Dict): 문서 소스 데이터
-        highlight (Dict): 하이라이트된 부분
-
-    Example:
-        >>> result = {
-        ...     "id": "507f1f77bcf86cd799439011",
-        ...     "score": 1.5,
-        ...     "source": {...},
-        ...     "highlight": {"title": ["<em>Django</em> Tutorial"]}
-        ... }
-        >>> serializer = SearchResultSerializer(result)
+    PostDocumentSerializer를 상속받아 검색 결과에 필요한 필드를 추가하고,
+    'content' 필드는 응답에서 제외합니다.
     """
-
-    post_id = serializers.CharField(help_text="MongoDB 게시물 ID")
+    # content와 meta_description 필드를 부모로부터 상속받지 않도록 None으로 설정
+    content = None
+    meta_description = None
+    
     score = serializers.FloatField(help_text="검색 관련도 점수")
+    highlight = serializers.SerializerMethodField(help_text="하이라이트된 필드")
+
+    def get_highlight(self, obj):
+        """
+        highlight 객체에서 하이라이트된 HTML 스니펫을 추출합니다.
+        """
+        highlight_data = obj.get("highlight", {})
+        
+        # ES 5.x 이상에서는 highlight 필드가 list of strings로 반환됨
+        # 이를 단일 문자열로 합쳐서 프론트엔드에서 사용하기 쉽게 만듦
+        formatted_highlights = {}
+        for field, snippets in highlight_data.items():
+            formatted_highlights[field] = " ... ".join(snippets)
+            
+        return formatted_highlights
 
 
 class SearchResponseSerializer(serializers.Serializer):

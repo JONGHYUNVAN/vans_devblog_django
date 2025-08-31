@@ -196,31 +196,17 @@ class Command(BaseCommand):
     def _rebuild_indexes(self):
         """
         Elasticsearch 인덱스를 재구축합니다.
-
-        Raises:
-            CommandError: 인덱스 재구축 실패
         """
         try:
-            # 사용자 확인
             self.stdout.write(
-                self.style.WARNING("모든 검색 인덱스가 삭제되고 재생성됩니다. 계속하시겠습니까? [y/N]: "),
-                ending="",
+                self.style.WARNING("모든 검색 인덱스가 삭제되고 재생성됩니다.")
             )
-
-            confirm = input().lower().strip()
-            if confirm not in ["y", "yes"]:
-                self.stdout.write(self.style.SUCCESS("인덱스 재구축이 취소되었습니다."))
-                return
-
             self.stdout.write("Elasticsearch 인덱스 재구축 중...")
-
             rebuild_indexes()
-
             self.stdout.write(self.style.SUCCESS("모든 인덱스가 성공적으로 재구축되었습니다!"))
             self.stdout.write("재구축된 인덱스:")
             self.stdout.write("  - vans_posts (게시물 검색용)")
             self.stdout.write("  - vans_suggestions (자동완성용)")
-
         except Exception as e:
             logger.error(f"Index rebuild failed: {str(e)}")
             raise CommandError(f"인덱스 재구축 실패: {str(e)}")

@@ -6,6 +6,7 @@ VansDevBlog의 MongoDB Post 데이터를 Elasticsearch로 동기화하여
 """
 
 import logging
+import sys
 from datetime import timedelta
 from typing import Any, Dict, List
 
@@ -45,6 +46,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # UTF-8 강제 설정
+        if sys.stdout.encoding != 'utf-8':
+            sys.stdout.reconfigure(encoding='utf-8')
+            
         self.stdout.write("MongoDB → Elasticsearch 데이터 동기화 시작")
         self.stdout.write("=" * 60)
 
@@ -75,6 +80,7 @@ class Command(BaseCommand):
         except Exception as e:
             logger.error(f"Data sync failed: {str(e)}")
             raise CommandError(f"데이터 동기화 실패: {str(e)}")
+
 
     def _check_connections(
         self, mongo_client: MongoDBClient, es_client: ElasticsearchClient

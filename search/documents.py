@@ -6,22 +6,7 @@ Elasticsearch 문서 스키마와 인덱스 매핑을 정의합니다.
 """
 
 import logging
-from typing import Any, Dict
-
-from django.conf import settings
-from elasticsearch_dsl import (
-    Boolean,
-    Completion,
-    Date,
-    Document,
-    Float,
-    Integer,
-    Keyword,
-    Object,
-    Text,
-    analyzer,
-)
-from elasticsearch_dsl.connections import connections
+from .utils.pm_plain import tiptap_to_plain
 
 logger = logging.getLogger("search")
 
@@ -85,8 +70,10 @@ class PostDocument(Document):
     Attributes:
         post_id (str): MongoDB ObjectId 문자열
         title (str): 게시물 제목 (한국어/영어 분석)
-        content (str): 게시물 내용 (한국어/영어 분석)
-        summary (str): 게시물 요약
+        content (str): 게시물 내용 (JSON)
+        summary (str): 게시물 요약 (JSON)
+        content_text (str): 게시물 내용 (Plain Text for search)
+        summary_text (str): 게시물 요약 (Plain Text for search)
         slug (str): URL 슬러그
         category (str): 카테고리 (키워드 검색)
         tags (List[str]): 태그 목록
@@ -107,7 +94,7 @@ class PostDocument(Document):
         >>> post_doc = PostDocument(
         ...     post_id="507f1f77bcf86cd799439011",
         ...     title="Django와 Elasticsearch 연동하기",
-        ...     content="Django 프로젝트에서 Elasticsearch를...",
+        ...     content_text="Django 프로젝트에서 Elasticsearch를...",
         ...     category="Backend",
         ...     tags=["Django", "Elasticsearch", "Python"]
         ... )
@@ -130,13 +117,15 @@ class PostDocument(Document):
         },
     )
 
-    # 내용 - 다국어 분석
-    content = Text(
+    # 원본 JSON 컨텐츠 (검색에는 사용하지 않음)
+    content = Object(enabled=False)
+    summary = Object(enabled=False)
+
+    # 검색 및 하이라이팅을 위한 Plain Text 필드
+    content_text = Text(
         analyzer=korean_analyzer, fields={"english": Text(analyzer=english_analyzer)}
     )
-
-    # 요약
-    summary = Text(
+    summary_text = Text(
         analyzer=korean_analyzer, fields={"english": Text(analyzer=english_analyzer)}
     )
 
@@ -345,73 +334,63 @@ class PostDocument(Document):
     def create_from_mongo_post(cls, mongo_post: Dict[str, Any]) -> "PostDocument":
         """
         MongoDB Post 문서에서 PostDocument 인스턴스를 생성합니다.
-
-        Args:
-            mongo_post (Dict[str, Any]): MongoDB Post 문서 데이터
-
-        Returns:
-            PostDocument: 생성된 PostDocument 인스턴스
-
-        Example:
-            >>> mongo_data = {
-            ...     "_id": ObjectId("507f1f77bcf86cd799439011"),
-            ...     "title": "Django Tutorial",
-            ...     "content": "Django is a web framework...",
-            ...     "category": "Backend"
-            ... }
-            >>> post_doc = PostDocument.create_from_mongo_post(mongo_data)
+        DB에 저장된 실제 snake_case 필드명을 기준으로 정확히 매핑합니다.
         """
         try:
-            # MongoDB ObjectId를 문자열로 변환
             post_id = str(mongo_post.get("_id", ""))
+            title = mongo_post.get("title", "")
 
-            # 작성자 정보 추출
-            author_data = mongo_post.get("author", {})
+            # 실제 DB 필드명(snake_case)을 기준으로 데이터를 읽어옵니다.
+            content_json = mongo_post.get("content", {})
+            summary_text = mongo_post.get("topic", "")
+            author_email = mongo_post.get("author_email")
+            view_count = mongo_post.get("view_count", 0)
+            like_count = mongo_post.get("like_count", 0)
+            thumbnail = mongo_post.get("thumbnail")
+            updated_at = mongo_post.get("updated_date") # 실제 필드명 사용
+
+            # 'content' JSON을 일반 텍스트로 파싱합니다.
+            content_text = tiptap_to_plain(content_json)
+
             author = {
-                "user_id": str(author_data.get("_id", "")),
-                "username": author_data.get("username", ""),
-                "display_name": author_data.get("display_name", ""),
-                "profile_image": author_data.get("profile_image", ""),
+                "user_id": author_email,
+                "username": author_email.split('@')[0] if author_email else "",
+                "display_name": author_email.split('@')[0] if author_email else "",
+                "profile_image": "",
             }
 
-            # 언어 감지 (한국어 포함 여부로 판단)
-            title = mongo_post.get("title", "")
-            content = mongo_post.get("content", "")
             language = (
                 "ko"
-                if any("\uAC00" <= char <= "\uD7A3" for char in title + content)
+                if any("\uAC00" <= char <= "\uD7A3" for char in title + content_text)
                 else "en"
             )
+            word_count = len(content_text.split())
+            reading_time = max(1, word_count // 200)
 
-            # 읽기 시간 계산 (단어 수 기준)
-            word_count = len(content.split())
-            reading_time = max(1, word_count // 200)  # 분당 200단어 기준
-
+            # Elasticsearch 문서 스키마에 맞춰 데이터를 채웁니다.
             return cls(
                 meta={"id": post_id},
                 post_id=post_id,
                 title=title,
-                content=content,
-                summary=mongo_post.get("summary", ""),
-                slug=mongo_post.get("slug", ""),
+                content=content_json,
+                summary=summary_text,
+                content_text=content_text,
+                summary_text=summary_text,
+                theme=mongo_post.get("theme"),
                 category=mongo_post.get("category", ""),
                 tags=mongo_post.get("tags", []),
                 author=author,
-                # published_date=mongo_post.get("published_date"),  # 제거됨
-                updated_date=mongo_post.get("updated_date"),
-                view_count=mongo_post.get("view_count", 0),
-                like_count=mongo_post.get("like_count", 0),
-                comment_count=mongo_post.get("comment_count", 0),
-                is_published=mongo_post.get("is_published", False),
+                updated_date=updated_at,
+                view_count=view_count,
+                like_count=like_count,
                 language=language,
                 reading_time=reading_time,
-                featured_image=mongo_post.get("featured_image", ""),
-                meta_description=mongo_post.get("meta_description", ""),
+                featured_image=thumbnail,
                 search_boost=mongo_post.get("search_boost", 1.0),
             )
 
         except Exception as e:
-            logger.error(f"Failed to create PostDocument from mongo data: {str(e)}")
+            logger.error(f"Failed to create PostDocument from mongo data for post_id {post_id}: {str(e)}")
             raise ValueError(f"Invalid MongoDB post data: {str(e)}")
 
 
@@ -523,6 +502,7 @@ def delete_indexes():
 
 def rebuild_indexes():
     """
+
     Elasticsearch 인덱스를 재구축합니다.
 
     Example:

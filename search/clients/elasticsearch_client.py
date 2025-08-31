@@ -9,41 +9,19 @@ from typing import Any, Dict, List, Optional
 
 from elasticsearch_dsl.connections import connections
 
+from ..services.content_parser import parse_rich_text_json
+
 logger = logging.getLogger("search")
 
 
 class ElasticsearchClient:
     """
     Elasticsearch 연결 및 검색 작업을 관리하는 클라이언트 클래스.
-
-    이 클래스는 Elasticsearch 서버와의 연결을 관리하고,
-    검색, 인덱싱, 클러스터 상태 확인 등의 작업을 수행합니다.
-
-    Attributes:
-        client (Elasticsearch): Elasticsearch 클라이언트 인스턴스
-
-    Example:
-        >>> es_client = ElasticsearchClient()
-        >>> health = es_client.get_cluster_health()
-        >>> print(health['status'])
-        'green'
-
-        >>> results = es_client.search_posts("Django")
-        >>> print(f"Found {results['total']} posts")
     """
 
     def __init__(self, timeout: Optional[int] = None):
         """
         ElasticsearchClient 인스턴스를 초기화합니다.
-
-        Django 설정에서 Elasticsearch 연결 정보를 가져와서
-        클라이언트 연결을 설정합니다.
-
-        Args:
-            timeout (Optional[int]): 연결 타임아웃 (초)
-
-        Raises:
-            ConnectionError: Elasticsearch 서버에 연결할 수 없는 경우
         """
         try:
             from django.conf import settings
@@ -62,14 +40,6 @@ class ElasticsearchClient:
     def check_connection(self) -> bool:
         """
         Elasticsearch 서버 연결 상태를 확인합니다.
-
-        Returns:
-            bool: 연결 성공 시 True, 실패 시 False
-
-        Example:
-            >>> es_client = ElasticsearchClient()
-            >>> if es_client.check_connection():
-            ...     print("Elasticsearch is connected")
         """
         try:
             self.client.ping()
@@ -82,20 +52,6 @@ class ElasticsearchClient:
     def get_cluster_health(self) -> Dict[str, Any]:
         """
         Elasticsearch 클러스터 상태 정보를 반환합니다.
-
-        Returns:
-            Dict[str, Any]: 클러스터 상태 정보
-                - status (str): 클러스터 상태 (green, yellow, red)
-                - number_of_nodes (int): 노드 수
-                - number_of_data_nodes (int): 데이터 노드 수
-                - active_shards (int): 활성 샤드 수
-
-        Raises:
-            ConnectionError: Elasticsearch 연결 실패
-
-        Example:
-            >>> health = es_client.get_cluster_health()
-            >>> print(f"Cluster status: {health['status']}")
         """
         try:
             health = self.client.cluster.health()
@@ -110,23 +66,6 @@ class ElasticsearchClient:
     ) -> bool:
         """
         인덱스가 존재하지 않으면 생성합니다.
-
-        Args:
-            index_name (str): 생성할 인덱스 이름
-            mapping (Dict[str, Any]): 인덱스 매핑 설정
-
-        Returns:
-            bool: 인덱스 생성 성공 시 True, 이미 존재하거나 실패 시 False
-
-        Example:
-            >>> mapping = {
-            ...     "mappings": {
-            ...         "properties": {
-            ...             "title": {"type": "text"}
-            ...         }
-            ...     }
-            ... }
-            >>> es_client.create_index_if_not_exists("test_index", mapping)
         """
         try:
             if not self.client.indices.exists(index=index_name):
@@ -143,15 +82,6 @@ class ElasticsearchClient:
     def delete_index(self, index_name: str) -> bool:
         """
         인덱스를 삭제합니다.
-
-        Args:
-            index_name (str): 삭제할 인덱스 이름
-
-        Returns:
-            bool: 삭제 성공 시 True, 실패 시 False
-
-        Example:
-            >>> es_client.delete_index("old_index")
         """
         try:
             if self.client.indices.exists(index=index_name):
@@ -174,49 +104,16 @@ class ElasticsearchClient:
         sort: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         """
-        게시물을 검색합니다.
-
-        Args:
-            query (str): 검색할 키워드
-            filters (Optional[Dict[str, Any]]): 검색 필터
-                - category (str): 카테고리 필터
-                - tags (List[str]): 태그 필터
-                - date_range (Dict): 날짜 범위 필터
-                - language (str): 언어 필터
-            page (int): 페이지 번호 (기본값: 1)
-            page_size (int): 페이지 크기 (기본값: 20)
-            sort (Optional[List[Dict[str, str]]]): 정렬 옵션
-
-        Returns:
-            Dict[str, Any]: 검색 결과
-                - total (int): 전체 결과 수
-                - hits (List[Dict]): 검색 결과 문서들
-                - aggregations (Dict): 집계 결과 (카테고리, 태그 등)
-
-        Example:
-            >>> results = es_client.search_posts(
-            ...     query="Django",
-            ...     filters={"category": "Backend"},
-            ...     page=1,
-            ...     page_size=10
-            ... )
-            >>> print(f"Found {results['total']} posts")
+        게시물을 검색하고, Elasticsearch에 저장된 실제 데이터(_source)를 기반으로 응답을 생성합니다.
+        'content' 필드를 반드시 포함하여 반환합니다.
         """
         try:
-            # 기본 검색 쿼리 구성
+            # 검색 쿼리: description과 topic을 대상으로 함
             if query.strip():
                 search_query = {
                     "multi_match": {
                         "query": query,
-                        "fields": [
-                            "title^3",  # 제목에 가중치 3배
-                            "title.english^2",
-                            "content",
-                            "content.english",
-                            "summary^2",
-                            "summary.english^2",
-                            "tags^2",
-                        ],
+                        "fields": ["title^3", "description", "topic^2", "tags^2"],
                         "type": "best_fields",
                         "fuzziness": "AUTO",
                     }
@@ -226,81 +123,79 @@ class ElasticsearchClient:
 
             # 필터 조건 구성
             filter_conditions = []
-
             if filters:
-                if filters.get("theme"):
-                    filter_conditions.append({"term": {"theme": filters["theme"]}})
-
-                if filters.get("category"):
-                    filter_conditions.append(
-                        {"term": {"category": filters["category"]}}
-                    )
-
+                for field in ["theme", "category", "language"]:
+                    if filters.get(field):
+                        filter_conditions.append({"term": {field: filters[field]}})
                 if filters.get("tags"):
                     filter_conditions.append({"terms": {"tags": filters["tags"]}})
 
-                if filters.get("language"):
-                    filter_conditions.append(
-                        {"term": {"language": filters["language"]}}
-                    )
-
-                # date_range 필터 제거됨 (published_date 없음)
-                # if filters.get("date_range"):
-                #     date_filter = {"range": {"published_date": {}}}
-                #     if filters["date_range"].get("start"):
-                #         date_filter["range"]["published_date"]["gte"] = filters[
-                #             "date_range"
-                #         ]["start"]
-                #     if filters["date_range"].get("end"):
-                #         date_filter["range"]["published_date"]["lte"] = filters[
-                #             "date_range"
-                #         ]["end"]
-                #     filter_conditions.append(date_filter)
-
-            # 전체 쿼리 구성
+            # Elasticsearch 쿼리 본문
             body = {
-                "query": {
-                    "bool": {"must": [search_query], "filter": filter_conditions}
-                },
+                "query": {"bool": {"must": [search_query], "filter": filter_conditions}},
                 "highlight": {
                     "fields": {
                         "title": {},
-                        "content": {"fragment_size": 150, "number_of_fragments": 3},
-                        "summary": {},
+                        "description": {"fragment_size": 150, "number_of_fragments": 1},
+                        "topic": {"fragment_size": 150, "number_of_fragments": 1},
                     }
                 },
-                # aggregation 제거 (fielddata 오류 방지)
-                # "aggs": {
-                #     "categories": {"terms": {"field": "category", "size": 10}},
-                #     "tags": {"terms": {"field": "tags", "size": 20}},
-                #     "languages": {"terms": {"field": "language"}},
-                # },
                 "from": (page - 1) * page_size,
                 "size": page_size,
+                "sort": sort or [{"_score": {"order": "desc"}}],
             }
-
-            # 정렬 옵션 추가
-            if sort:
-                body["sort"] = sort
-            else:
-                body["sort"] = [
-                    {"_score": {"order": "desc"}},
-                    # {"published_date": {"order": "desc"}},  # published_date 제거됨
-                ]
 
             # 검색 실행
             response = self.client.search(index="vans_posts", body=body)
 
-            # 결과 포맷팅 (ID와 점수만 반환)
+            # 결과 포맷팅
+            hits = []
+            for hit in response["hits"]["hits"]:
+                source = hit["_source"]
+                highlight = hit.get("highlight", {})
+
+                # content 필드 생성 (본문 스니펫)
+                content_snippet = ""
+                if "description" in highlight:
+                    content_snippet = highlight["description"][0]
+                elif source.get("description"):
+                    content_snippet = (source["description"][:150] + '...') if len(source["description"]) > 150 else source["description"]
+
+                # summary 필드 생성 (주제)
+                summary_text = source.get("topic", "")
+
+                # author 객체 생성
+                author_email = source.get("author_email")
+                author = {
+                    "user_id": author_email,
+                    "username": author_email.split('@')[0] if author_email else None,
+                    "display_name": author_email.split('@')[0] if author_email else None,
+                    "profile_image": None,
+                } if author_email else None
+
+                # 최종 API 응답 객체 생성
+                formatted_hit = {
+                    "post_id": source.get("post_id"),
+                    "title": source.get("title"),
+                    "summary": summary_text,
+                    "content": content_snippet, # content 필드 추가
+                    "category": source.get("category"),
+                    "tags": source.get("tags"),
+                    "author": author,
+                    "updated_date": source.get("updated_date"),
+                    "view_count": source.get("view_count"),
+                    "like_count": source.get("like_count"),
+                    "language": source.get("language"),
+                    "reading_time": source.get("reading_time"),
+                    "featured_image": source.get("thumbnail"),
+                    "score": hit["_score"],
+                    "highlight": highlight,
+                }
+                hits.append(formatted_hit)
+
             result = {
                 "total": response["hits"]["total"]["value"],
-                "hits": [
-                    {
-                        "post_id": hit["_source"]["post_id"],  # MongoDB ObjectId
-                        "score": hit["_score"],
-                    }
-                    for hit in response["hits"]["hits"]
-                ],
+                "hits": hits,
                 "aggregations": response.get("aggregations", {}),
             }
 
@@ -320,23 +215,8 @@ class ElasticsearchClient:
     ) -> List[str]:
         """
         자동완성 제안을 반환합니다.
-
-        Args:
-            prefix (str): 자동완성할 접두사
-            suggestion_type (Optional[str]): 제안 타입 (query, tag, category)
-            language (str): 언어 코드 (기본값: "ko")
-            size (int): 반환할 제안 수 (기본값: 10)
-
-        Returns:
-            List[str]: 자동완성 제안 목록
-
-        Example:
-            >>> suggestions = es_client.get_autocomplete_suggestions("Djan")
-            >>> print(suggestions)
-            ['Django', 'Django REST', 'Django Tutorial']
         """
         try:
-            # 간단한 검색 기반 자동완성 (completion suggester 대신)
             body = {
                 "query": {
                     "bool": {
@@ -354,19 +234,15 @@ class ElasticsearchClient:
 
             response = self.client.search(index="vans_posts", body=body)
 
-            # 제안 추출 및 중복 제거
             suggestions = set()
-
             for hit in response["hits"]["hits"]:
                 source = hit["_source"]
                 title = source.get("title", "")
                 tags = source.get("tags", [])
                 
-                # 제목에서 제안 추출
                 if title.lower().startswith(prefix.lower()):
                     suggestions.add(title)
                 
-                # 태그에서 제안 추출
                 for tag in tags:
                     if tag.lower().startswith(prefix.lower()):
                         suggestions.add(tag)
@@ -384,22 +260,9 @@ class ElasticsearchClient:
     def get_popular_searches(self, limit: int = 10) -> List[Dict[str, Any]]:
         """
         인기 검색어 목록을 반환합니다.
-
-        Args:
-            limit (int): 반환할 검색어 수 (기본값: 10)
-
-        Returns:
-            List[Dict[str, Any]]: 인기 검색어 목록
-                각 항목은 {'query': str, 'count': int} 형태
-
-        Example:
-            >>> popular = es_client.get_popular_searches(5)
-            >>> for item in popular:
-            ...     print(f"{item['query']}: {item['count']} searches")
         """
         try:
-            # 실제 구현에서는 검색 로그 데이터를 분석
-            # 현재는 더미 데이터 반환
+            # This is a dummy implementation
             dummy_popular = [
                 {"query": "Django", "count": 150},
                 {"query": "Python", "count": 120},
@@ -407,9 +270,7 @@ class ElasticsearchClient:
                 {"query": "REST API", "count": 80},
                 {"query": "웹 개발", "count": 75},
             ]
-
             return dummy_popular[:limit]
-
         except Exception as e:
             logger.error(f"Failed to get popular searches: {str(e)}")
             return []
