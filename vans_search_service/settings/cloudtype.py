@@ -5,6 +5,7 @@ CloudType.io 플랫폼에 최적화된 Django 설정입니다.
 """
 
 import os
+import socket
 
 from .base import (
     BASE_DIR,
@@ -19,19 +20,28 @@ from .base import (
 
 DEBUG = False
 
-# CloudType.io 도메인 허용
 allowed_hosts_env = get_env_variable("ALLOWED_HOSTS", "")
 ALLOWED_HOSTS = [
     "*.cloudtype.app",
-    "localhost", 
-    "127.0.0.1",
-    "10.88.28.16",
 ]
 
 # 환경변수에서 추가 호스트 설정
 if allowed_hosts_env:
     additional_hosts = [host.strip() for host in allowed_hosts_env.split(",") if host.strip()]
     ALLOWED_HOSTS.extend(additional_hosts)
+
+# Add internal IP for health checks in cloud environments
+try:
+    hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
+    INTERNAL_IPS = [ip for ip in ips if not ip.startswith('127.')]
+    ALLOWED_HOSTS.extend(INTERNAL_IPS)
+except socket.gaierror:
+    # Handle the case where hostname might not be resolvable
+    pass
+
+# For development, allow localhost and 127.0.0.1 if DEBUG is True
+if DEBUG:
+    ALLOWED_HOSTS.extend(['localhost', '127.0.0.1', '[::1]'])
 
 # CSRF 설정 (CloudType.io 도메인 포함)
 CSRF_TRUSTED_ORIGINS = [
