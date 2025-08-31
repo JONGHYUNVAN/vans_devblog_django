@@ -5,6 +5,7 @@ VansDevBlog Search Service Production Settings
 """
 
 import logging.config
+
 import socket
 from .base import *  # 모든 기본 설정 import
 
@@ -32,6 +33,10 @@ except socket.gaierror:
 additional_hosts = get_env_variable("ALLOWED_HOSTS", "").split(",")
 if additional_hosts and additional_hosts[0]:
     ALLOWED_HOSTS.extend([host.strip() for host in additional_hosts if host.strip()])
+
+# =============================================================================
+# SECURITY SETTINGS (운영용)
+# =============================================================================
 
 # HTTPS 설정
 SECURE_SSL_REDIRECT = True
@@ -131,10 +136,6 @@ LOGGING = {
             "format": "{levelname} {asctime} {message}",
             "style": "{",
         },
-        "json": {
-            "format": '{"level": "{levelname}", "time": "{asctime}", "module": "{module}", "message": "{message}"}',
-            "style": "{",
-        },
     },
     "handlers": {
         "console": {
@@ -148,15 +149,7 @@ LOGGING = {
             "filename": BASE_DIR / "logs" / "production.log",
             "maxBytes": 1024 * 1024 * 10,  # 10MB
             "backupCount": 5,
-            "formatter": "json",
-        },
-        "error_file": {
-            "level": "ERROR",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": BASE_DIR / "logs" / "error.log",
-            "maxBytes": 1024 * 1024 * 10,  # 10MB
-            "backupCount": 5,
-            "formatter": "json",
+            "formatter": "verbose",
         },
     },
     "root": {
@@ -165,27 +158,28 @@ LOGGING = {
     },
     "loggers": {
         "django": {
-            "handlers": ["console", "file", "error_file"],
+            "handlers": ["console", "file"],
             "level": "INFO",
             "propagate": False,
         },
         "search": {
-            "handlers": ["console", "file", "error_file"],
+            "handlers": ["console", "file"],
             "level": "INFO",
             "propagate": False,
         },
         "elasticsearch": {
-            "handlers": ["console", "file", "error_file"],
+            "handlers": ["console", "file"],
             "level": "WARNING",
-            "propagate": False,
-        },
-        "django.security": {
-            "handlers": ["error_file"],
-            "level": "ERROR",
             "propagate": False,
         },
     },
 }
+
+# =============================================================================
+# EMAIL BACKEND (운영용)
+# =============================================================================
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # =============================================================================
 # CACHE SETTINGS (운영용)
@@ -215,30 +209,3 @@ else:
             "LOCATION": "unique-snowflake",
         }
     }
-
-# =============================================================================
-# EMAIL BACKEND (운영용)
-# =============================================================================
-
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-
-# =============================================================================
-# SENTRY 에러 모니터링 (선택사항)
-# =============================================================================
-
-if get_env_variable("SENTRY_DSN", None):
-    import sentry_sdk
-    from sentry_sdk.integrations.django import DjangoIntegration
-    from sentry_sdk.integrations.logging import LoggingIntegration
-
-    sentry_logging = LoggingIntegration(
-        level=logging.INFO,  # Capture info and above as breadcrumbs
-        event_level=logging.ERROR,  # Send errors as events
-    )
-
-    sentry_sdk.init(
-        dsn=get_env_variable("SENTRY_DSN"),
-        integrations=[DjangoIntegration(), sentry_logging],
-        traces_sample_rate=0.1,
-        send_default_pii=True,
-    )
