@@ -33,15 +33,21 @@ if allowed_hosts_env:
 # Add internal IP for health checks in cloud environments
 try:
     hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
+    print(f"DEBUG: Hostname: {hostname}")
+    print(f"DEBUG: IPs from gethostbyname_ex: {ips}")
     INTERNAL_IPS = [ip for ip in ips if not ip.startswith('127.')]
+    print(f"DEBUG: INTERNAL_IPS: {INTERNAL_IPS}")
     ALLOWED_HOSTS.extend(INTERNAL_IPS)
 except socket.gaierror:
     # Handle the case where hostname might not be resolvable
+    print("DEBUG: socket.gaierror occurred during hostname resolution.")
     pass
 
 # For development, allow localhost and 127.0.0.1 if DEBUG is True
 if DEBUG:
     ALLOWED_HOSTS.extend(['localhost', '127.0.0.1', '[::1]'])
+
+print(f"DEBUG: Final ALLOWED_HOSTS: {ALLOWED_HOSTS}")
 
 # CSRF 설정 (CloudType.io 도메인 포함)
 CSRF_TRUSTED_ORIGINS = [
