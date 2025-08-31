@@ -6,6 +6,7 @@ VansDevBlog Search Service Development Settings
 
 import logging.config
 
+import socket
 from .base import *  # 모든 기본 설정 import
 
 # =============================================================================
@@ -14,7 +15,20 @@ from .base import *  # 모든 기본 설정 import
 
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
+ALLOWED_HOSTS = []
+
+# Add internal IP for health checks in cloud environments
+try:
+    hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
+    INTERNAL_IPS = [ip for ip in ips if not ip.startswith('127.')]
+    ALLOWED_HOSTS.extend(INTERNAL_IPS)
+except socket.gaierror:
+    # Handle the case where hostname might not be resolvable
+    pass
+
+# For development, allow localhost and 127.0.0.1 if DEBUG is True
+if DEBUG:
+    ALLOWED_HOSTS.extend(['localhost', '127.0.0.1', '[::1]', '0.0.0.0'])
 
 # =============================================================================
 # CORS SETTINGS (개발용)
