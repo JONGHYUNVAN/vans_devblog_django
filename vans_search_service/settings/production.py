@@ -4,21 +4,34 @@ VansDevBlog Search Service Production Settings
 운영 환경에서 사용되는 Django 설정입니다.
 """
 
-import logging
-
-from .base import (
-    BASE_DIR,
-    get_env_variable,
-    DATABASES,
-)
+import logging.config
+import socket
+from .base import *  # 모든 기본 설정 import
 
 # =============================================================================
-# SECURITY SETTINGS
+# DEBUG SETTINGS
 # =============================================================================
 
 DEBUG = False
 
-ALLOWED_HOSTS = get_env_variable("ALLOWED_HOSTS", "localhost").split(",")
+ALLOWED_HOSTS = [
+    "*.cloudtype.app",
+    "*.sel4.cloudtype.app",
+]
+
+# Add internal IP for health checks in cloud environments
+try:
+    hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
+    INTERNAL_IPS = [ip for ip in ips if not ip.startswith('127.')]
+    ALLOWED_HOSTS.extend(INTERNAL_IPS)
+except socket.gaierror:
+    # Handle the case where hostname might not be resolvable
+    pass
+
+# 환경변수에서 추가 호스트 설정
+additional_hosts = get_env_variable("ALLOWED_HOSTS", "").split(",")
+if additional_hosts and additional_hosts[0]:
+    ALLOWED_HOSTS.extend([host.strip() for host in additional_hosts if host.strip()])
 
 # HTTPS 설정
 SECURE_SSL_REDIRECT = True
@@ -49,9 +62,14 @@ SESSION_COOKIE_AGE = 86400  # 24시간
 
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
-    f"https://{host}"
-    for host in get_env_variable("FRONTEND_HOSTS", "localhost").split(",")
+    "https://*.cloudtype.app",
+    "https://*.sel4.cloudtype.app",
 ]
+
+# 환경변수에서 추가 프론트엔드 호스트 설정
+frontend_hosts = get_env_variable("FRONTEND_HOSTS", "").split(",")
+if frontend_hosts and frontend_hosts[0]:
+    CORS_ALLOWED_ORIGINS.extend([f"https://{host.strip()}" for host in frontend_hosts if host.strip()])
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -59,27 +77,47 @@ CORS_ALLOW_CREDENTIALS = True
 # DATABASE SETTINGS (운영용)
 # =============================================================================
 
-# SQLite 대신 PostgreSQL 사용 권장
-if get_env_variable("DATABASE_URL", None):
-    import dj_database_url
-
-    DATABASES["default"] = dj_database_url.parse(get_env_variable("DATABASE_URL"))
+# MongoDB와 Elasticsearch만 사용하므로 SQLite로 간단히 설정
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
+}
 
 # =============================================================================
 # STATIC FILES (운영용)
 # =============================================================================
 
-# AWS S3 또는 CDN 사용 권장
-STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = (
-    "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
-)
+STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+
+# WhiteNoise 설정 (정적 파일 서빙)
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# WhiteNoise 미들웨어 추가
+MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
 
 # =============================================================================
 # LOGGING CONFIGURATION (운영용)
 # =============================================================================
 
-LOGS_DIR = BASE_DIR / "logs"
+# Elasticsearch 운영 환경 설정
+ELASTICSEARCH_HOST = get_env_variable("ELASTICSEARCH_HOST", "localhost:9200")
+ELASTICSEARCH_USERNAME = get_env_variable("ELASTICSEARCH_USERNAME", "elastic")
+ELASTICSEARCH_PASSWORD = get_env_variable("ELASTICSEARCH_PASSWORD", "")
+
+# 운영 환경 Elasticsearch 설정
+es_config = {
+    "hosts": [f"https://{ELASTICSEARCH_HOST}"],
+    "timeout": 30,
+    "verify_certs": True,  # 운영환경에서는 SSL 인증서 검증 활성화
+    "http_auth": (ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD),
+}
+
+ELASTICSEARCH_DSL = {
+    "default": es_config,
+}
 
 LOGGING = {
     "version": 1,
@@ -87,6 +125,10 @@ LOGGING = {
     "formatters": {
         "verbose": {
             "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "{levelname} {asctime} {message}",
             "style": "{",
         },
         "json": {
@@ -98,10 +140,15 @@ LOGGING = {
         },
     },
     "handlers": {
+        "console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
         "file": {
             "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": LOGS_DIR / "production.log",
+            "filename": BASE_DIR / "logs" / "production.log",
             "maxBytes": 1024 * 1024 * 10,  # 10MB
             "backupCount": 5,
             "formatter": "json",
@@ -109,34 +156,29 @@ LOGGING = {
         "error_file": {
             "level": "ERROR",
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": LOGS_DIR / "error.log",
+            "filename": BASE_DIR / "logs" / "error.log",
             "maxBytes": 1024 * 1024 * 10,  # 10MB
             "backupCount": 5,
             "formatter": "json",
         },
-        "console": {
-            "level": "WARNING",
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
     },
     "root": {
-        "handlers": ["console", "file"],
+        "handlers": ["console"],
         "level": "INFO",
     },
     "loggers": {
         "django": {
-            "handlers": ["file", "error_file"],
+            "handlers": ["console", "file", "error_file"],
             "level": "INFO",
             "propagate": False,
         },
         "search": {
-            "handlers": ["file", "error_file"],
+            "handlers": ["console", "file", "error_file"],
             "level": "INFO",
             "propagate": False,
         },
         "elasticsearch": {
-            "handlers": ["file", "error_file"],
+            "handlers": ["console", "file", "error_file"],
             "level": "WARNING",
             "propagate": False,
         },
@@ -152,7 +194,7 @@ LOGGING = {
 # CACHE SETTINGS (운영용)
 # =============================================================================
 
-# Redis 캐시 사용 권장 (운영 환경)
+# Redis가 있으면 Redis 사용, 없으면 로컬 메모리 캐시 사용
 if get_env_variable("REDIS_URL", None):
     CACHES = {
         "default": {
@@ -169,20 +211,19 @@ if get_env_variable("REDIS_URL", None):
             "TIMEOUT": 300,
         }
     }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "unique-snowflake",
+        }
+    }
 
 # =============================================================================
-# EMAIL SETTINGS (운영용)
+# EMAIL BACKEND (운영용)
 # =============================================================================
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = get_env_variable("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(get_env_variable("EMAIL_PORT", "587"))
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = get_env_variable("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = get_env_variable("EMAIL_HOST_PASSWORD", "")
-DEFAULT_FROM_EMAIL = get_env_variable(
-    "DEFAULT_FROM_EMAIL", "noreply@vansdevblog.online"
-)
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # =============================================================================
 # SENTRY 에러 모니터링 (선택사항)

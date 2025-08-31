@@ -13,6 +13,7 @@ from .base import (
     MIDDLEWARE,
     DATABASES,
     INSTALLED_APPS,
+    ROOT_URLCONF,
 )
 
 # =============================================================================
@@ -28,6 +29,9 @@ ALLOWED_HOSTS = [
 
 # Add this line to ensure INSTALLED_APPS from base.py is used
 INSTALLED_APPS = INSTALLED_APPS
+
+# Add this line to ensure ROOT_URLCONF from base.py is used
+ROOT_URLCONF = ROOT_URLCONF
 
 # 환경변수에서 추가 호스트 설정
 if allowed_hosts_env:
