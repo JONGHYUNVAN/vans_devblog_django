@@ -88,6 +88,44 @@ def api_logger(func):
     return wrapper
 
 
+# 헬스체크 전용 경량 로거
+def health_logger(func):
+    """헬스체크 전용 경량 로깅 데코레이터"""
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        
+        try:
+            # API 함수 실행
+            response = func(*args, **kwargs)
+            execution_time = time.time() - start_time
+            
+            # 헬스체크는 에러 시에만 로깅
+            if response.status_code != 200:
+                logger.warning(f"헬스체크 실패 - 상태코드: {response.status_code}, 실행시간: {execution_time:.3f}초")
+            # 성공 시에는 디버그 레벨로만 로깅 (기본적으로 출력 안됨)
+            else:
+                logger.debug(f"헬스체크 성공 - 실행시간: {execution_time:.3f}초")
+            
+            return response
+            
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(f"헬스체크 에러 - {str(e)}, 실행시간: {execution_time:.3f}초")
+            
+            # 에러 응답 반환
+            return Response(
+                {
+                    "status": "unhealthy",
+                    "service": "VansDevBlog Search Service",
+                    "version": "1.0.0",
+                    "error": str(e),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+    
+    return wrapper
+
+
 @swagger_auto_schema(
     method="get",
     operation_summary="서비스 상태 확인",
@@ -109,31 +147,57 @@ def api_logger(func):
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
-@api_logger
+@health_logger
 def health_check(request):
     """
     서비스 상태를 확인하는 헬스체크 엔드포인트입니다.
+    결과를 30분간 캐시하여 과도한 체크를 방지합니다.
 
     Returns:
         Response: 서비스 상태 정보
     """
+    from django.core.cache import cache
+    
+    # 캐시 키
+    cache_key = "health_check_result"
+    cache_timeout = 1800  # 30분 (1800초)
+    
+    # 캐시된 결과 확인
+    cached_result = cache.get(cache_key)
+    if cached_result:
+        # 캐시된 결과에 타임스탬프 추가
+        cached_result['cached'] = True
+        cached_result['last_check'] = cache.get('health_check_timestamp', 'unknown')
+        return Response(cached_result, status=status.HTTP_200_OK)
+    
     try:
+        # 실제 헬스체크 수행
         health_service = HealthService()
         health_data = health_service.get_health_status()
-
+        
+        # 타임스탬프 추가
+        from datetime import datetime
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        health_data['cached'] = False
+        health_data['last_check'] = current_time
+        
+        # 결과 캐시에 저장
+        cache.set(cache_key, health_data, cache_timeout)
+        cache.set('health_check_timestamp', current_time, cache_timeout)
+        
         return Response(health_data, status=status.HTTP_200_OK)
 
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
-        return Response(
-            {
-                "status": "unhealthy",
-                "service": "VansDevBlog Search Service",
-                "version": "1.0.0",
-                "error": str(e),
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        error_response = {
+            "status": "unhealthy",
+            "service": "VansDevBlog Search Service",
+            "version": "1.0.0",
+            "error": str(e),
+            "cached": False,
+            "last_check": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        return Response(error_response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @swagger_auto_schema(

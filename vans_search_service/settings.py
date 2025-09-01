@@ -356,6 +356,11 @@ LOGGING = {
             "level": "INFO",
             "propagate": True,
         },
+        "search.health": {
+            "handlers": ["file", "console"],
+            "level": "WARNING",  # 헬스체크는 WARNING 이상만 출력
+            "propagate": False,
+        },
         "elasticsearch": {
             "handlers": ["file", "console"],
             "level": "WARNING",

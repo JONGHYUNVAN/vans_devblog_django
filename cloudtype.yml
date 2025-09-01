@@ -35,10 +35,10 @@ deploy:
   start:
     command: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 vans_search_service.wsgi:application
 
-  # 헬스체크 설정
+  # 헬스체크 설정 (30분마다)
   health_check:
     path: /api/v1/search/health/
-    interval: 30
+    interval: 1800  # 30분 (30 * 60초)
     timeout: 10
     retries: 3
 
