@@ -233,6 +233,7 @@ class PostDocument(Document):
             "description": self.description,
             "topic": self.topic,
             "category": self.category,
+            "theme": self.theme,
             "tags": self.tags,
             "author_email": self.author_email,
             "view_count": self.view_count,

@@ -95,6 +95,9 @@ class PostDocumentSerializer(serializers.Serializer):
     )
 
     # 분류 필드
+    theme = serializers.CharField(
+        max_length=100, allow_blank=True, required=False, help_text="테마"
+    )
     category = serializers.CharField(
         max_length=100, allow_blank=True, required=False, help_text="카테고리"
     )

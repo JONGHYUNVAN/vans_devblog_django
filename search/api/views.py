@@ -88,9 +88,9 @@ def api_logger(func):
     return wrapper
 
 
-# 헬스체크 전용 경량 로거
+# 헬스체크 전용 경량 로거 (로그 최소화)
 def health_logger(func):
-    """헬스체크 전용 경량 로깅 데코레이터"""
+    """헬스체크 전용 경량 로깅 데코레이터 - 에러 시에만 로깅"""
     def wrapper(*args, **kwargs):
         start_time = time.time()
         
@@ -99,12 +99,10 @@ def health_logger(func):
             response = func(*args, **kwargs)
             execution_time = time.time() - start_time
             
-            # 헬스체크는 에러 시에만 로깅
+            # 에러 시에만 로깅 (성공은 완전히 무시)
             if response.status_code != 200:
                 logger.warning(f"헬스체크 실패 - 상태코드: {response.status_code}, 실행시간: {execution_time:.3f}초")
-            # 성공 시에는 디버그 레벨로만 로깅 (기본적으로 출력 안됨)
-            else:
-                logger.debug(f"헬스체크 성공 - 실행시간: {execution_time:.3f}초")
+            # 성공 시에는 아무 로그도 남기지 않음
             
             return response
             
@@ -147,7 +145,7 @@ def health_logger(func):
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
-@health_logger
+@health_logger  
 def health_check(request):
     """
     서비스 상태를 확인하는 헬스체크 엔드포인트입니다.
@@ -157,6 +155,7 @@ def health_check(request):
         Response: 서비스 상태 정보
     """
     from django.core.cache import cache
+    from datetime import datetime
     
     # 캐시 키
     cache_key = "health_check_result"
@@ -165,10 +164,11 @@ def health_check(request):
     # 캐시된 결과 확인
     cached_result = cache.get(cache_key)
     if cached_result:
-        # 캐시된 결과에 타임스탬프 추가
-        cached_result['cached'] = True
-        cached_result['last_check'] = cache.get('health_check_timestamp', 'unknown')
-        return Response(cached_result, status=status.HTTP_200_OK)
+        # 캐시된 결과에 타임스탬프 추가 (딕셔너리 복사해서 수정)
+        response_data = cached_result.copy()
+        response_data['cached'] = True
+        response_data['last_check'] = cache.get('health_check_timestamp', 'unknown')
+        return Response(response_data, status=status.HTTP_200_OK)
     
     try:
         # 실제 헬스체크 수행
@@ -176,7 +176,6 @@ def health_check(request):
         health_data = health_service.get_health_status()
         
         # 타임스탬프 추가
-        from datetime import datetime
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         health_data['cached'] = False
         health_data['last_check'] = current_time
@@ -188,7 +187,7 @@ def health_check(request):
         return Response(health_data, status=status.HTTP_200_OK)
 
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
+        # 에러 로깅은 health_logger 데코레이터에서 처리됨
         error_response = {
             "status": "unhealthy",
             "service": "VansDevBlog Search Service",

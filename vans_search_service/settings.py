@@ -357,8 +357,8 @@ LOGGING = {
             "propagate": True,
         },
         "search.health": {
-            "handlers": ["file", "console"],
-            "level": "WARNING",  # 헬스체크는 WARNING 이상만 출력
+            "handlers": ["file"],  # 콘솔 출력 제거
+            "level": "ERROR",  # 헬스체크는 ERROR 이상만 출력
             "propagate": False,
         },
         "elasticsearch": {

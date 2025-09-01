@@ -179,6 +179,7 @@ class ElasticsearchClient:
                     "title": source.get("title"),
                     "summary": summary_text,
                     "content": content_snippet, # content 필드 추가
+                    "theme": source.get("theme"),
                     "category": source.get("category"),
                     "tags": source.get("tags"),
                     "author": author,
