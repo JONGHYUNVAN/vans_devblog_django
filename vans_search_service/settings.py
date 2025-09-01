@@ -178,10 +178,11 @@ REST_FRAMEWORK = {
 # CORS SETTINGS
 # =============================================================================
 
-CORS_ALLOW_ALL_ORIGINS = True  # Development only
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Development only
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Next.js frontend
     "http://127.0.0.1:3000",
+    "https://vansdevblog.online",  # Production frontend
 ]
 
 

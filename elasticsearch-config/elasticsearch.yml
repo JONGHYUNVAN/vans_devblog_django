@@ -102,3 +102,4 @@ indices.requests.cache.size: 2%
 # 힙 덤프 방지
 path.repo: ["/usr/share/elasticsearch/backup"]
 
+
