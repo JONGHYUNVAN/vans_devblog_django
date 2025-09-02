@@ -58,13 +58,12 @@ class SearchService:
 
             # 검색 로그 기록 및 인기 검색어 업데이트
             try:
-                # 인기 검색어 업데이트 (빈 검색어가 아닌 경우만)
-                if query and query.strip():
+                # 인기 검색어 업데이트 (검색어가 있고, 결과가 1개 이상인 경우만)
+                if query and query.strip() and response_data['total'] > 0:
                     PopularSearchDocument.update_popular_search(query.strip())
-
-                logger.debug(
-                    f"Popular search updated: query='{query}', results={response_data['total']}"
-                )
+                    logger.debug(
+                        f"Popular search updated: query='{query}', results={response_data['total']}"
+                    )
 
             except Exception as log_error:
                 logger.warning(f"Failed to update popular search: {str(log_error)}")

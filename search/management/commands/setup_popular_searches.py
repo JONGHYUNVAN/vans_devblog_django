@@ -41,27 +41,7 @@ class Command(BaseCommand):
                 self.style.SUCCESS("Popular search index created successfully")
             )
 
-            # 테스트 데이터 추가 (선택사항)
-            self.stdout.write("Adding test data...")
-            test_searches = [
-                "Django",
-                "Python",
-                "Elasticsearch",
-                "FastAPI",
-                "React",
-                "Vue.js",
-                "MongoDB",
-                "PostgreSQL",
-                "Docker",
-                "Kubernetes",
-            ]
-
-            for search_term in test_searches:
-                PopularSearchDocument.update_popular_search(search_term)
-
-            self.stdout.write(
-                self.style.SUCCESS(f"Added {len(test_searches)} test popular searches")
-            )
+            
 
         except Exception as e:
             self.stdout.write(
