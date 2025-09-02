@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 
 from ..clients.elasticsearch_client import ElasticsearchClient
 from ..clients.mongodb_client import MongoDBClient
-from ..models import PopularSearch
+from ..documents.popular_search_document import PopularSearchDocument
 from .cache_service import CacheService
 
 logger = logging.getLogger("search")
@@ -58,21 +58,16 @@ class SearchService:
 
             # 검색 로그 기록 및 인기 검색어 업데이트
             try:
-                from ..models import PopularSearch, SearchLog
-
-                # 검색 로그 기록
-                SearchLog.record_log(query=query, results_count=response_data["total"])
-
                 # 인기 검색어 업데이트 (빈 검색어가 아닌 경우만)
                 if query and query.strip():
-                    PopularSearch.update_popular_search(query.strip())
+                    PopularSearchDocument.update_popular_search(query.strip())
 
                 logger.debug(
-                    f"Search log recorded: query='{query}', results={response_data['total']}"
+                    f"Popular search updated: query='{query}', results={response_data['total']}"
                 )
 
             except Exception as log_error:
-                logger.warning(f"Failed to record search log: {str(log_error)}")
+                logger.warning(f"Failed to update popular search: {str(log_error)}")
 
             self.cache_service.set_search_result(
                 query, filters, page, page_size, response_data
@@ -121,6 +116,7 @@ class SearchService:
     def get_popular_searches(self) -> Dict[str, Any]:
         """
         인기 검색어 목록을 제공합니다.
+        Elasticsearch에서 인기 검색어 데이터를 가져옵니다.
         """
         try:
             # 캐시 확인
@@ -129,21 +125,21 @@ class SearchService:
                 logger.debug("Popular searches cache hit")
                 return {"popular_searches": cached_popular}
 
-            # Django 모델에서 실제 인기 검색어 가져오기
+            # Elasticsearch에서 실제 인기 검색어 가져오기
             try:
-                popular_list = PopularSearch.get_top_popular_searches(limit=10)
+                popular_list = PopularSearchDocument.get_top_popular_searches(limit=10)
                 if popular_list:
                     # 캐시 저장
                     self.cache_service.set_popular_searches(popular_list)
-                    logger.debug(f"Popular searches from DB: {len(popular_list)} items")
+                    logger.debug(f"Popular searches from ES: {len(popular_list)} items")
                     return {"popular_searches": popular_list}
-            except Exception as db_error:
+            except Exception as es_error:
                 logger.warning(
-                    f"Failed to get popular searches from DB: {str(db_error)}"
+                    f"Failed to get popular searches from Elasticsearch: {str(es_error)}"
                 )
 
-            # DB에 데이터가 없으면 빈 배열 반환
-            logger.info("No popular searches found in DB - returning empty list")
+            # ES에 데이터가 없으면 빈 배열 반환
+            logger.info("No popular searches found in ES - returning empty list")
             return {"popular_searches": []}
 
         except Exception as e:
