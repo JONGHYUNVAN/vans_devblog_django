@@ -114,23 +114,15 @@ class SearchService:
 
     def get_popular_searches(self) -> Dict[str, Any]:
         """
-        인기 검색어 목록을 제공합니다.
-        Elasticsearch에서 인기 검색어 데이터를 가져옵니다.
+        실시간 인기 검색어 목록을 제공합니다.
+        Elasticsearch에서 직접 가져와서 실시간성을 보장합니다.
         """
         try:
-            # 캐시 확인
-            cached_popular = self.cache_service.get_popular_searches()
-            if cached_popular:
-                logger.debug("Popular searches cache hit")
-                return {"popular_searches": cached_popular}
-
-            # Elasticsearch에서 실제 인기 검색어 가져오기
+            # 캐싱 없이 직접 Elasticsearch에서 가져오기 (실시간성 확보)
             try:
                 popular_list = PopularSearchDocument.get_top_popular_searches(limit=10)
                 if popular_list:
-                    # 캐시 저장
-                    self.cache_service.set_popular_searches(popular_list)
-                    logger.debug(f"Popular searches from ES: {len(popular_list)} items")
+                    logger.debug(f"Real-time popular searches from ES: {len(popular_list)} items")
                     return {"popular_searches": popular_list}
             except Exception as es_error:
                 logger.warning(
