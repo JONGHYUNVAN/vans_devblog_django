@@ -135,14 +135,22 @@ LOG_DIR = Path(BASE_DIR) / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Elasticsearch 운영 환경 설정
-ELASTICSEARCH_HOST = get_env_variable("ELASTICSEARCH_HOST", "localhost:9200")
+ELASTICSEARCH_HOST_WITH_PORT = get_env_variable("ELASTICSEARCH_HOST", "localhost:9200")
 ELASTICSEARCH_USERNAME = get_env_variable("ELASTICSEARCH_USERNAME", "elastic")
 ELASTICSEARCH_PASSWORD = get_env_variable("ELASTICSEARCH_PASSWORD", "")
 
+# ELASTICSEARCH_HOST_WITH_PORT에서 호스트와 포트 분리
+es_host_parts = ELASTICSEARCH_HOST_WITH_PORT.split(':')
+es_host = es_host_parts[0]
+es_port = int(es_host_parts[1]) if len(es_host_parts) > 1 else 9200
+
 # 운영 환경 Elasticsearch 설정
-# (현재 연결 정상 동작 중이므로 기존 http_auth 유지)
 es_config = {
-    "hosts": [f"https://{ELASTICSEARCH_HOST}"],
+    "hosts": [{
+        "host": es_host,
+        "port": es_port,
+        "scheme": "https"
+    }],
     "timeout": 30,
     "verify_certs": True,  # 운영환경에서는 SSL 인증서 검증 활성화
     "http_auth": (ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD),
