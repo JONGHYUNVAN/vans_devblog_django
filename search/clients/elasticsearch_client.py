@@ -108,30 +108,53 @@ class ElasticsearchClient:
         'content' 필드를 반드시 포함하여 반환합니다.
         """
         try:
-            # 최적화된 검색 쿼리: 성능 중심 설계
+            # 안전하고 빠른 검색 쿼리 (기존 필드 호환)
             if query.strip():
-                # 짧은 쿼리는 정확한 매칭, 긴 쿼리는 퍼지 검색
-                if len(query.strip()) <= 2:
-                    # 짧은 쿼리: 정확한 매칭만
-                    search_query = {
-                        "multi_match": {
-                            "query": query,
-                            "fields": ["title^4", "topic^3", "description^2", "content_text", "tags^2"],
-                            "type": "phrase_prefix",  # 빠른 접두사 검색
-                            "max_expansions": 10  # 확장 제한
-                        }
+                # 단순하고 안정적인 쿼리 구조
+                search_query = {
+                    "bool": {
+                        "should": [
+                            # 제목에서 정확한 매칭 (가장 높은 점수)
+                            {
+                                "match": {
+                                    "title": {
+                                        "query": query,
+                                        "boost": 4,
+                                        "fuzziness": "1" if len(query) > 3 else "0"
+                                    }
+                                }
+                            },
+                            # 주제에서 매칭
+                            {
+                                "match": {
+                                    "topic": {
+                                        "query": query,
+                                        "boost": 3,
+                                        "fuzziness": "1" if len(query) > 3 else "0"
+                                    }
+                                }
+                            },
+                            # 설명에서 매칭
+                            {
+                                "match": {
+                                    "description": {
+                                        "query": query,
+                                        "boost": 2,
+                                        "fuzziness": "1" if len(query) > 3 else "0"
+                                    }
+                                }
+                            },
+                            # 태그에서 정확한 매칭
+                            {
+                                "terms": {
+                                    "tags": [query],
+                                    "boost": 2
+                                }
+                            }
+                        ],
+                        "minimum_should_match": 1
                     }
-                else:
-                    # 긴 쿼리: 퍼지 검색 허용
-                    search_query = {
-                        "multi_match": {
-                            "query": query,
-                            "fields": ["title^4", "topic^3", "description^2", "content_text", "tags^2"],
-                            "type": "cross_fields",  # 빠른 교차 필드 검색
-                            "fuzziness": "1",  # 고정 퍼지니스 (빠름)
-                            "prefix_length": 2  # 접두사 2자리 고정
-                        }
-                    }
+                }
             else:
                 search_query = {"match_all": {}}
 
