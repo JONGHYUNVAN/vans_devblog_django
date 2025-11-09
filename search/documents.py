@@ -71,23 +71,20 @@ class PostDocument(Document):
         post_id (str): MongoDB ObjectId 문자열
         title (str): 게시물 제목 (한국어/영어 분석)
         content (str): 게시물 내용 (JSON)
-        summary (str): 게시물 요약 (JSON)
         content_text (str): 게시물 내용 (Plain Text for search)
-        summary_text (str): 게시물 요약 (Plain Text for search)
-        slug (str): URL 슬러그
-        category (str): 카테고리 (키워드 검색)
+        topic (str): 게시물 주제
+        description (str): 게시물 설명
+        mainCategory (str): 메인 카테고리 (기존 테마)
+        subCategory (str): 서브 카테고리 (기존 카테고리)
         tags (List[str]): 태그 목록
-        author (Dict): 작성자 정보
-        published_date (datetime): 발행일
-        updated_date (datetime): 수정일
-        view_count (int): 조회수
-        like_count (int): 좋아요 수
-        comment_count (int): 댓글 수
-        is_published (bool): 발행 여부
+        authorEmail (str): 작성자 이메일
+        viewCount (int): 조회수
+        likeCount (int): 좋아요 수
+        thumbnail (str): 썸네일 이미지 URL
         language (str): 언어 코드 (ko, en)
+        updated_date (datetime): 수정일
+        slug (str): URL 슬러그 (옵션)
         reading_time (int): 예상 읽기 시간 (분)
-        featured_image (str): 대표 이미지 URL
-        meta_description (str): SEO 메타 설명
 
     Example:
         >>> # 문서 생성
@@ -95,7 +92,8 @@ class PostDocument(Document):
         ...     post_id="507f1f77bcf86cd799439011",
         ...     title="Django와 Elasticsearch 연동하기",
         ...     content_text="Django 프로젝트에서 Elasticsearch를...",
-        ...     category="Backend",
+        ...     mainCategory="Backend",
+        ...     subCategory="Framework",
         ...     tags=["Django", "Elasticsearch", "Python"]
         ... )
         >>> post_doc.save()
@@ -117,60 +115,61 @@ class PostDocument(Document):
         },
     )
 
-    # 원본 JSON 컨텐츠 (검색에는 사용하지 않음)
+    # === 검색 핵심 필드 ===
+    # 원본 JSON 컨텐츠 (검색에는 사용하지 않음, 저장만)
     content = Object(enabled=False)
-    summary = Object(enabled=False)
 
-    # 검색 및 하이라이팅을 위한 Plain Text 필드
+    # 검색 및 하이라이팅을 위한 Plain Text 필드 (가장 중요)
     content_text = Text(
-        analyzer=korean_analyzer, fields={"english": Text(analyzer=english_analyzer)}
-    )
-    summary_text = Text(
-        analyzer=korean_analyzer, fields={"english": Text(analyzer=english_analyzer)}
-    )
-
-    # URL 슬러그
-    slug = Keyword()
-
-    # 테마 - 키워드 검색 (카테고리 상위 개념)
-    theme = Keyword(fields={"text": Text(analyzer="keyword")})
-
-    # 카테고리 - 키워드 검색
-    category = Keyword(fields={"text": Text(analyzer="keyword")})
-
-    # 태그 - 배열 키워드
-    tags = Keyword(multi=True, fields={"suggest": Completion()})
-
-    # 작성자 정보
-    author = Object(
-        properties={
-            "user_id": Keyword(),
-            "username": Keyword(),
-            "display_name": Text(analyzer="keyword"),
-            "profile_image": Keyword(),
+        analyzer=korean_analyzer, 
+        fields={
+            "english": Text(analyzer=english_analyzer),
+            "raw": Keyword()  # 정확한 구문 검색용
         }
     )
 
-    # 날짜 필드
-    published_date = Date()
-    updated_date = Date()
+    # 주제 - 높은 가중치 검색 필드
+    topic = Text(
+        analyzer=korean_analyzer,
+        fields={
+            "english": Text(analyzer=english_analyzer),
+            "keyword": Keyword(),  # 정확한 매칭용
+            "suggest": Completion()  # 자동완성용
+        }
+    )
 
-    # 통계 필드
-    view_count = Integer()
-    like_count = Integer()
-    comment_count = Integer()
+    # 설명 - 중간 가중치 검색 필드
+    description = Text(
+        analyzer=korean_analyzer, 
+        fields={
+            "english": Text(analyzer=english_analyzer),
+            "suggest": Completion()
+        }
+    )
 
-    # 상태 필드
-    is_published = Boolean()
+    # === 분류 필드 (필터링용) ===
+    # 메인 카테고리 - 정확한 필터링
+    mainCategory = Keyword(fields={"suggest": Completion()})
 
-    # 언어 코드
+    # 서브 카테고리 - 정확한 필터링
+    subCategory = Keyword(fields={"suggest": Completion()})
+
+    # 태그 - 배열 키워드 (검색 + 필터링)
+    tags = Keyword(multi=True, fields={"suggest": Completion()})
+
+    # === 메타데이터 (필터링/정렬용만) ===
+    # 작성자 이메일 (필터링용)
+    authorEmail = Keyword()
+
+    # 언어 코드 (필터링용)
     language = Keyword()
 
-    # 기타 메타데이터
-    reading_time = Integer()
-    featured_image = Keyword()
-    meta_description = Text(analyzer=korean_analyzer)
-    search_boost = Float()
+    # 날짜 필드 (정렬용)
+    updated_date = Date()
+
+    # 통계 필드 (정렬용만 - 검색에는 불필요)
+    viewCount = Integer(index=False)  # 검색 불가, 정렬만 가능
+    likeCount = Integer(index=False)  # 검색 불가, 정렬만 가능
 
     class Index:
         """Elasticsearch 인덱스 설정.
@@ -216,23 +215,36 @@ class PostDocument(Document):
 
         name = "vans_posts"
         settings = {
-            # === 기본 인덱스 설정 ===
+            # === 성능 최적화된 인덱스 설정 ===
             "number_of_shards": 1,  # 샤드 수
             "number_of_replicas": 0,  # 복제본 수
-            "max_result_window": 10000,  # 최대 검색 결과 수
+            "max_result_window": 1000,  # 최대 검색 결과 수 (성능 향상)
+            "refresh_interval": "5s",  # 리프레시 간격 증가 (성능 향상)
+            "index.mapping.total_fields.limit": 50,  # 필드 수 제한
+            "index.max_ngram_diff": 2,  # N-gram 차이 제한
             # === 텍스트 분석 설정 ===
             "analysis": {
                 # --- 분석기 (Analyzers) ---
                 "analyzer": {
-                    # 한국어 텍스트 분석기
+                    # 성능 최적화된 한국어 분석기
                     "korean_analyzer": {
                         "type": "custom",
-                        "tokenizer": "nori_tokenizer",  # 한국어 형태소 분석
+                        "tokenizer": "nori_tokenizer",
                         "filter": [
-                            "lowercase",  # 소문자 변환
-                            "nori_part_of_speech",  # 품사 태그 필터
-                            "nori_readingform",  # 읽기 형태 변환
-                            "stop",  # 불용어 제거
+                            "lowercase",
+                            "nori_part_of_speech",
+                            "nori_readingform",
+                            "trim"  # 공백 제거로 성능 향상
+                        ],
+                    },
+                    # 빠른 검색용 분석기 추가
+                    "korean_search_analyzer": {
+                        "type": "custom",
+                        "tokenizer": "nori_tokenizer",
+                        "filter": [
+                            "lowercase",
+                            "nori_part_of_speech",
+                            "trim"
                         ],
                     },
                     # 영어 텍스트 분석기
@@ -254,52 +266,36 @@ class PostDocument(Document):
                 },
                 # --- 토크나이저 (Tokenizers) ---
                 "tokenizer": {
-                    # 한국어 형태소 분석 토크나이저
+                    # 성능 최적화된 토크나이저
                     "nori_tokenizer": {
                         "type": "nori_tokenizer",
-                        "decompound_mode": "mixed",  # 복합어 분해 모드
-                        "user_dictionary_rules": [  # 사용자 정의 사전
-                            "Django",  # 웹 프레임워크
-                            "Elasticsearch",  # 검색 엔진
-                            "REST API",  # API 방식
-                            "Spring Boot",  # Java 프레임워크
-                            "React",  # 프론트엔드 라이브러리
-                            "Vue.js",  # 프론트엔드 프레임워크
+                        "decompound_mode": "discard",  # 빠른 처리를 위해 discard 사용
+                        "discard_punctuation": True,  # 구두점 제거로 성능 향상
+                        "user_dictionary_rules": [  # 필수 용어만 유지
+                            "Django",
+                            "Elasticsearch", 
+                            "React",
+                            "Vue.js",
+                            "Spring Boot"
                         ],
                     }
                 },
                 # --- 필터 (Filters) ---
                 "filter": {
-                    # 한국어 품사 태그 필터
+                    # 성능 최적화된 품사 태그 필터
                     "nori_part_of_speech": {
                         "type": "nori_part_of_speech",
-                        "stoptags": [  # 제외할 품사 태그들
-                            "E",  # 어미
-                            "IC",  # 감탄사
-                            "J",  # 관계언(조사)
-                            "MAG",  # 일반 부사
-                            "MAJ",  # 접속 부사
-                            "MM",  # 관형사
-                            "SP",  # 공백
-                            "SSC",  # 닫는 괄호
-                            "SSO",  # 여는 괄호
-                            "SC",  # 구분자
-                            "SE",  # 생략 기호
-                            "XPN",  # 체언 접두사
-                            "XSA",  # 형용사 파생 접미사
-                            "XSN",  # 명사 파생 접미사
-                            "XSV",  # 동사 파생 접미사
-                            "UNA",  # 알 수 없는 문자
-                            "NA",  # 분석 불가
-                            "VSV",  # 동사
+                        "stoptags": [  # 필수 태그만 제외 (성능 향상)
+                            "E", "IC", "J", "MAG", "MAJ", "MM", "SP", 
+                            "SSC", "SSO", "SC", "SE", "UNA", "NA"
                         ],
                     },
                     # 한국어 읽기 형태 변환 필터
                     "nori_readingform": {"type": "nori_readingform"},
-                    # 불용어 제거 필터
-                    "stop": {
+                    # 최소한의 불용어 (성능 향상)
+                    "minimal_stop": {
                         "type": "stop",
-                        "stopwords": ["_korean_", "_english_"],  # 한국어/영어 기본 불용어
+                        "stopwords": ["이", "그", "저", "이것", "그것", "저것"],  # 최소한의 한국어 불용어
                     },
                 },
             },
@@ -340,24 +336,20 @@ class PostDocument(Document):
             post_id = str(mongo_post.get("_id", ""))
             title = mongo_post.get("title", "")
 
-            # 실제 DB 필드명(snake_case)을 기준으로 데이터를 읽어옵니다.
+            # be_post 구조에 맞춰 데이터를 읽어옵니다.
             content_json = mongo_post.get("content", {})
-            summary_text = mongo_post.get("topic", "")
-            author_email = mongo_post.get("author_email")
-            view_count = mongo_post.get("view_count", 0)
-            like_count = mongo_post.get("like_count", 0)
-            thumbnail = mongo_post.get("thumbnail")
-            updated_at = mongo_post.get("updated_date") # 실제 필드명 사용
+            topic = mongo_post.get("topic", "")
+            description = mongo_post.get("description", "")
+            author_email = mongo_post.get("authorEmail", "")
+            view_count = mongo_post.get("viewCount", 0)
+            like_count = mongo_post.get("likeCount", 0)
+            thumbnail = mongo_post.get("thumbnail", "")
+            main_category = mongo_post.get("mainCategory", "")
+            sub_category = mongo_post.get("subCategory", "")
+            updated_at = mongo_post.get("updatedAt", mongo_post.get("updated_date"))
 
             # 'content' JSON을 일반 텍스트로 파싱합니다.
             content_text = tiptap_to_plain(content_json)
-
-            author = {
-                "user_id": author_email,
-                "username": author_email.split('@')[0] if author_email else "",
-                "display_name": author_email.split('@')[0] if author_email else "",
-                "profile_image": "",
-            }
 
             language = (
                 "ko"
@@ -373,20 +365,17 @@ class PostDocument(Document):
                 post_id=post_id,
                 title=title,
                 content=content_json,
-                summary=summary_text,
                 content_text=content_text,
-                summary_text=summary_text,
-                theme=mongo_post.get("theme"),
-                category=mongo_post.get("category", ""),
+                topic=topic,
+                description=description,
+                mainCategory=main_category,
+                subCategory=sub_category,
                 tags=mongo_post.get("tags", []),
-                author=author,
+                authorEmail=author_email,
                 updated_date=updated_at,
-                view_count=view_count,
-                like_count=like_count,
+                viewCount=view_count,
+                likeCount=like_count,
                 language=language,
-                reading_time=reading_time,
-                featured_image=thumbnail,
-                search_boost=mongo_post.get("search_boost", 1.0),
             )
 
         except Exception as e:

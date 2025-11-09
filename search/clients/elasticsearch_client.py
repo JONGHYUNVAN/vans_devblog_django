@@ -108,45 +108,82 @@ class ElasticsearchClient:
         'content' 필드를 반드시 포함하여 반환합니다.
         """
         try:
-            # 검색 쿼리: description과 topic을 대상으로 함
+            # 최적화된 검색 쿼리: 성능 중심 설계
             if query.strip():
-                search_query = {
-                    "multi_match": {
-                        "query": query,
-                        "fields": ["title^3", "description", "topic^2", "tags^2"],
-                        "type": "best_fields",
-                        "fuzziness": "AUTO",
+                # 짧은 쿼리는 정확한 매칭, 긴 쿼리는 퍼지 검색
+                if len(query.strip()) <= 2:
+                    # 짧은 쿼리: 정확한 매칭만
+                    search_query = {
+                        "multi_match": {
+                            "query": query,
+                            "fields": ["title^4", "topic^3", "description^2", "content_text", "tags^2"],
+                            "type": "phrase_prefix",  # 빠른 접두사 검색
+                            "max_expansions": 10  # 확장 제한
+                        }
                     }
-                }
+                else:
+                    # 긴 쿼리: 퍼지 검색 허용
+                    search_query = {
+                        "multi_match": {
+                            "query": query,
+                            "fields": ["title^4", "topic^3", "description^2", "content_text", "tags^2"],
+                            "type": "cross_fields",  # 빠른 교차 필드 검색
+                            "fuzziness": "1",  # 고정 퍼지니스 (빠름)
+                            "prefix_length": 2  # 접두사 2자리 고정
+                        }
+                    }
             else:
                 search_query = {"match_all": {}}
 
-            # 필터 조건 구성
+            # 필터 조건 구성 (업데이트된 필드명 사용)
             filter_conditions = []
             if filters:
-                for field in ["theme", "category", "language"]:
-                    if filters.get(field):
-                        filter_conditions.append({"term": {field: filters[field]}})
+                # 업데이트된 필드명 사용
+                field_mapping = {
+                    "theme": "mainCategory",  # 기존 theme -> mainCategory
+                    "category": "subCategory",  # 기존 category -> subCategory
+                    "mainCategory": "mainCategory",
+                    "subCategory": "subCategory",
+                    "language": "language"
+                }
+                
+                for old_field, new_field in field_mapping.items():
+                    if filters.get(old_field):
+                        filter_conditions.append({"term": {new_field: filters[old_field]}})
+                        
                 if filters.get("tags"):
                     filter_conditions.append({"terms": {"tags": filters["tags"]}})
 
-            # Elasticsearch 쿼리 본문
+            # 최적화된 Elasticsearch 쿼리 본문
             body = {
                 "query": {"bool": {"must": [search_query], "filter": filter_conditions}},
+                "_source": {
+                    "excludes": ["content", "content_text"]  # 대용량 필드 제외로 속도 향상
+                },
                 "highlight": {
+                    "pre_tags": ["<mark>"],
+                    "post_tags": ["</mark>"],
                     "fields": {
-                        "title": {},
-                        "description": {"fragment_size": 150, "number_of_fragments": 1},
-                        "topic": {"fragment_size": 150, "number_of_fragments": 1},
-                    }
+                        "title": {"fragment_size": 100, "number_of_fragments": 1},
+                        "description": {"fragment_size": 120, "number_of_fragments": 1},
+                        "topic": {"fragment_size": 80, "number_of_fragments": 1},
+                    },
+                    "require_field_match": False  # 성능 향상
                 },
                 "from": (page - 1) * page_size,
-                "size": page_size,
+                "size": min(page_size, 50),  # 최대 50개로 제한
                 "sort": sort or [{"_score": {"order": "desc"}}],
+                "timeout": "1s"  # 1초 타임아웃 설정
             }
 
-            # 검색 실행
-            response = self.client.search(index="vans_posts", body=body)
+            # 검색 실행 (성능 최적화)
+            response = self.client.search(
+                index="vans_posts", 
+                body=body,
+                request_timeout=2,  # 2초 타임아웃
+                ignore_unavailable=True,  # 인덱스 없어도 오류 안내지 않음
+                allow_partial_search_results=True  # 부분 결과도 허용
+            )
 
             # 결과 포맷팅
             hits = []

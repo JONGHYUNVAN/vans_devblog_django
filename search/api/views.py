@@ -226,7 +226,7 @@ def search_posts(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 서비스 레이어로 위임
+        # 서비스 레이어로 위임 (성능 최적화: 인스턴스 재사용)
         search_service = SearchService()
         search_result = search_service.search_posts(serializer.validated_data)
 

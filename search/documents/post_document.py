@@ -35,19 +35,19 @@ class PostDocument(Document):
         post_id (str): MongoDB ObjectId 문자열
         title (str): 게시물 제목 (한국어/영어 분석)
         content (str): 게시물 내용 (한국어/영어 분석)
-        summary (str): 게시물 요약
-        slug (str): URL 슬러그
-        theme (str): 테마 (카테고리 상위 개념)
-        category (str): 카테고리 (키워드 검색)
+        topic (str): 게시물 주제
+        description (str): 게시물 설명
+        mainCategory (str): 메인 카테고리 (기존 테마)
+        subCategory (str): 서브 카테고리 (기존 카테고리)
         tags (List[str]): 태그 목록
-        author (Dict): 작성자 정보
-        updated_date (datetime): 수정일
-        view_count (int): 조회수
-        comment_count (int): 댓글 수
+        authorEmail (str): 작성자 이메일
+        viewCount (int): 조회수
+        likeCount (int): 좋아요 수
+        thumbnail (str): 썸네일 이미지 URL
         language (str): 언어 코드 (ko, en)
+        updated_date (datetime): 수정일
+        slug (str): URL 슬러그 (옵션)
         reading_time (int): 예상 읽기 시간 (분)
-        featured_image (str): 대표 이미지 URL
-        meta_description (str): SEO 메타 설명
         search_boost (float): 검색 가중치
 
     Example:
@@ -56,7 +56,8 @@ class PostDocument(Document):
         ...     post_id="507f1f77bcf86cd799439011",
         ...     title="Django와 Elasticsearch 연동하기",
         ...     content="Django 프로젝트에서 Elasticsearch를...",
-        ...     category="Backend",
+        ...     mainCategory="Backend",
+        ...     subCategory="Framework",
         ...     tags=["Django", "Elasticsearch", "Python"]
         ... )
         >>> post_doc.save()
@@ -88,45 +89,49 @@ class PostDocument(Document):
         analyzer=korean_analyzer, fields={"english": Text(analyzer=english_analyzer)}
     )
 
-    # URL 슬러그
-    slug = Keyword()
-
-    # 주제 - 키워드 검색 (카테고리 상위 개념)
-    topic = Keyword(fields={"text": Text(analyzer="keyword")})
-
-    # 카테고리 - 키워드 검색
-    category = Keyword(fields={"text": Text(analyzer="keyword")})
-
-    # 설명
-    description = Text(
-        analyzer=korean_analyzer, fields={"english": Text(analyzer=english_analyzer)}
+    # === 검색 핵심 필드 ===
+    # 주제 - 키워드 검색 (높은 가중치)
+    topic = Text(
+        analyzer=korean_analyzer, 
+        fields={
+            "english": Text(analyzer=english_analyzer),
+            "keyword": Keyword(),  # 정확한 매칭용
+            "suggest": Completion()  # 자동완성용
+        }
     )
 
-    # 태그 - 배열 키워드
+    # 설명 - 다국어 분석 (중간 가중치)
+    description = Text(
+        analyzer=korean_analyzer, 
+        fields={
+            "english": Text(analyzer=english_analyzer),
+            "suggest": Completion()
+        }
+    )
+
+    # === 분류 필드 (필터링용) ===
+    # 메인 카테고리 (기존 테마) - 정확한 필터링
+    mainCategory = Keyword(fields={"suggest": Completion()})
+
+    # 서브 카테고리 (기존 카테고리) - 정확한 필터링  
+    subCategory = Keyword(fields={"suggest": Completion()})
+
+    # 태그 - 배열 키워드 (검색 + 필터링)
     tags = Keyword(multi=True, fields={"suggest": Completion()})
 
-    # 작성자 이메일
-    author_email = Keyword()
+    # === 메타데이터 (필터링/정렬용만) ===
+    # 작성자 이메일 (필터링용)
+    authorEmail = Keyword()
 
-    # 날짜 필드
-    updated_date = Date()
-
-    # 통계 필드
-    view_count = Integer()
-    like_count = Integer()
-
-    # 테마
-    theme = Keyword(fields={"text": Text(analyzer="keyword")})
-
-    # 언어 코드
+    # 언어 코드 (필터링용)
     language = Keyword()
 
-    # 썸네일 이미지
-    thumbnail = Keyword()
+    # 날짜 필드 (정렬용)
+    updated_date = Date()
 
-    # 기타 메타데이터
-    reading_time = Integer()
-    search_boost = Float()
+    # 통계 필드 (정렬용만 - 검색에는 불필요)
+    viewCount = Integer(index=False)  # 검색 불가, 정렬만 가능
+    likeCount = Integer(index=False)  # 검색 불가, 정렬만 가능
 
     class Index:
         """Elasticsearch 인덱스 설정."""
@@ -203,17 +208,14 @@ class PostDocument(Document):
                 content=content,
                 description=mongo_post.get("description", ""),
                 topic=mongo_post.get("topic", ""),
-                category=mongo_post.get("category", ""),
+                mainCategory=mongo_post.get("mainCategory", ""),
+                subCategory=mongo_post.get("subCategory", ""),
                 tags=mongo_post.get("tags", []),
-                author_email=mongo_post.get("authorEmail", ""),
+                authorEmail=mongo_post.get("authorEmail", ""),
                 updated_date=mongo_post.get("updatedAt", mongo_post.get("updated_date")),
-                view_count=mongo_post.get("viewCount", 0),
-                like_count=mongo_post.get("likeCount", 0),
-                theme=mongo_post.get("theme", ""),
+                viewCount=mongo_post.get("viewCount", 0),
+                likeCount=mongo_post.get("likeCount", 0),
                 language=mongo_post.get("language", "ko"),
-                thumbnail=mongo_post.get("thumbnail", ""),
-                reading_time=reading_time,
-                search_boost=1.0,
             )
 
         except Exception as e:
@@ -232,12 +234,11 @@ class PostDocument(Document):
             "title": self.title,
             "description": self.description,
             "topic": self.topic,
-            "category": self.category,
-            "theme": self.theme,
+            "mainCategory": self.mainCategory,
+            "subCategory": self.subCategory,
             "tags": self.tags,
-            "author_email": self.author_email,
-            "view_count": self.view_count,
-            "like_count": self.like_count,
-            "reading_time": self.reading_time,
-            "thumbnail": self.thumbnail,
+            "authorEmail": self.authorEmail,
+            "viewCount": self.viewCount,
+            "likeCount": self.likeCount,
+            "language": self.language,
         }

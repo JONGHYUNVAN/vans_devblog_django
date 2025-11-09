@@ -11,14 +11,21 @@ logger = logging.getLogger("search")
 
 
 class SearchService:
+    # 클래스 레벨 인스턴스 재사용 (성능 최적화)
+    _es_client = None
+    _cache_service = None
+    
     def __init__(self):
-        self.es_client = ElasticsearchClient()
-        try:
-            self.mongo_client = MongoDBClient()
-        except Exception as e:
-            logger.warning(f"MongoDB client initialization failed: {str(e)}")
-            self.mongo_client = None
-        self.cache_service = CacheService()
+        # 싱글톤 패턴으로 클라이언트 인스턴스 재사용
+        if SearchService._es_client is None:
+            SearchService._es_client = ElasticsearchClient()
+        if SearchService._cache_service is None:
+            SearchService._cache_service = CacheService()
+            
+        self.es_client = SearchService._es_client
+        self.cache_service = SearchService._cache_service
+        # MongoDB 클라이언트는 검색에 불필요하므로 제거
+        self.mongo_client = None
 
     def search_posts(self, search_params: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -33,8 +40,12 @@ class SearchService:
             page_size = search_params.get("page_size", 20)
             sort_option = search_params.get("sort", "relevance")
 
+            # 새로운 필드명 지원 (mainCategory, subCategory)
+            main_category = search_params.get("mainCategory", theme)  # 하위 호환성
+            sub_category = search_params.get("subCategory", category)  # 하위 호환성
+            
             filters = self._build_filters(
-                theme, category, tags, language, date_from, date_to
+                main_category, sub_category, tags, language, date_from, date_to
             )
 
             cached_result = self.cache_service.get_search_result(
@@ -56,17 +67,24 @@ class SearchService:
 
             response_data = self._build_search_response(search_result, page, page_size)
 
-            # 검색 로그 기록 및 인기 검색어 업데이트
-            try:
-                # 인기 검색어 업데이트 (검색어가 있고, 결과가 1개 이상인 경우만)
-                if query and query.strip() and response_data['total'] > 0:
-                    PopularSearchDocument.update_popular_search(query.strip())
-                    logger.debug(
-                        f"Popular search updated: query='{query}', results={response_data['total']}"
-                    )
-
-            except Exception as log_error:
-                logger.warning(f"Failed to update popular search: {str(log_error)}")
+            # 인기 검색어 비동기 업데이트 (성능 향상)
+            if query and query.strip() and response_data['total'] > 0:
+                try:
+                    # 비동기로 처리하여 검색 속도에 영향 없이 처리
+                    from django.utils import timezone
+                    import threading
+                    
+                    def update_popular_async():
+                        try:
+                            PopularSearchDocument.update_popular_search(query.strip())
+                        except Exception as e:
+                            logger.warning(f"Async popular search update failed: {str(e)}")
+                    
+                    # 별도 스레드에서 비동기 실행
+                    threading.Thread(target=update_popular_async, daemon=True).start()
+                    
+                except Exception as log_error:
+                    logger.warning(f"Failed to start async popular search update: {str(log_error)}")
 
             self.cache_service.set_search_result(
                 query, filters, page, page_size, response_data

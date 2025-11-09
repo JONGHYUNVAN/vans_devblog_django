@@ -49,31 +49,26 @@ class PostDocumentSerializer(serializers.Serializer):
 
     Attributes:
         post_id (str): 게시물 ID
-        title (str): 제목
-        content (str): 내용
-        summary (str): 요약
-        slug (str): URL 슬러그
-        category (str): 카테고리
-        tags (List[str]): 태그 목록
-        author (Dict): 작성자 정보
-        published_date (datetime): 발행일
-        updated_date (datetime): 수정일
-        view_count (int): 조회수
-        like_count (int): 좋아요 수
-        comment_count (int): 댓글 수
-        is_published (bool): 발행 여부
-        language (str): 언어 코드
-        reading_time (int): 읽기 시간
-        featured_image (str): 대표 이미지
-        meta_description (str): 메타 설명
-        search_boost (float): 검색 부스트 점수
+        title (str): 제목 (검색 핵심 필드)
+        content (str): 내용 (검색 핵심 필드)
+        topic (str): 게시물 주제 (검색 핵심 필드)
+        description (str): 게시물 설명 (검색 필드)
+        mainCategory (str): 메인 카테고리 (필터링용)
+        subCategory (str): 서브 카테고리 (필터링용)
+        tags (List[str]): 태그 목록 (검색 + 필터링)
+        authorEmail (str): 작성자 이메일 (필터링용)
+        viewCount (int): 조회수 (정렬용만)
+        likeCount (int): 좋아요 수 (정렬용만)
+        language (str): 언어 코드 (필터링용)
+        updated_date (datetime): 수정일 (정렬용)
 
     Example:
         >>> post_data = {
         ...     "post_id": "507f1f77bcf86cd799439011",
         ...     "title": "Django Tutorial",
         ...     "content": "Django is a web framework...",
-        ...     "category": "Backend",
+        ...     "mainCategory": "Backend",
+        ...     "subCategory": "Framework",
         ...     "tags": ["Django", "Python"]
         ... }
         >>> serializer = PostDocumentSerializer(data=post_data)
@@ -87,19 +82,19 @@ class PostDocumentSerializer(serializers.Serializer):
     )
     title = serializers.CharField(max_length=200, help_text="게시물 제목")
     content = serializers.CharField(help_text="게시물 내용")
-    summary = serializers.CharField(
-        max_length=500, allow_blank=True, required=False, help_text="게시물 요약"
+    topic = serializers.CharField(
+        max_length=200, allow_blank=True, required=False, help_text="게시물 주제"
     )
-    slug = serializers.CharField(
-        max_length=200, allow_blank=True, required=False, help_text="URL 슬러그"
+    description = serializers.CharField(
+        max_length=500, allow_blank=True, required=False, help_text="게시물 설명"
     )
 
     # 분류 필드
-    theme = serializers.CharField(
-        max_length=100, allow_blank=True, required=False, help_text="테마"
+    mainCategory = serializers.CharField(
+        max_length=100, allow_blank=True, required=False, help_text="메인 카테고리 (기존 테마)"
     )
-    category = serializers.CharField(
-        max_length=100, allow_blank=True, required=False, help_text="카테고리"
+    subCategory = serializers.CharField(
+        max_length=100, allow_blank=True, required=False, help_text="서브 카테고리 (기존 카테고리)"
     )
     tags = serializers.ListField(
         child=serializers.CharField(max_length=50),
@@ -109,36 +104,21 @@ class PostDocumentSerializer(serializers.Serializer):
     )
 
     # 작성자 정보
-    author = AuthorSerializer(required=False, help_text="작성자 정보")
-
-    # 날짜 필드
-    published_date = serializers.DateTimeField(required=False, help_text="발행일")
-    updated_date = serializers.DateTimeField(required=False, help_text="수정일")
+    authorEmail = serializers.EmailField(
+        allow_blank=True, required=False, help_text="작성자 이메일"
+    )
 
     # 통계 필드
-    view_count = serializers.IntegerField(default=0, min_value=0, help_text="조회수")
-    like_count = serializers.IntegerField(default=0, min_value=0, help_text="좋아요 수")
-    comment_count = serializers.IntegerField(default=0, min_value=0, help_text="댓글 수")
+    viewCount = serializers.IntegerField(default=0, min_value=0, help_text="조회수")
+    likeCount = serializers.IntegerField(default=0, min_value=0, help_text="좋아요 수")
 
-    # 상태 필드
-    is_published = serializers.BooleanField(default=False, help_text="발행 여부")
+    # 언어 코드 (필터링용)
     language = serializers.CharField(
         max_length=10, default="ko", help_text="언어 코드 (ko, en)"
     )
 
-    # 메타데이터
-    reading_time = serializers.IntegerField(
-        default=1, min_value=1, help_text="예상 읽기 시간 (분)"
-    )
-    featured_image = serializers.URLField(
-        allow_blank=True, required=False, help_text="대표 이미지 URL"
-    )
-    meta_description = serializers.CharField(
-        max_length=300, allow_blank=True, required=False, help_text="SEO 메타 설명"
-    )
-    search_boost = serializers.FloatField(
-        default=1.0, min_value=0.1, max_value=10.0, help_text="검색 결과 부스트 점수"
-    )
+    # 날짜 필드 (정렬용)
+    updated_date = serializers.DateTimeField(required=False, help_text="수정일")
 
 
 class SearchRequestSerializer(serializers.Serializer):
@@ -173,11 +153,11 @@ class SearchRequestSerializer(serializers.Serializer):
     query = serializers.CharField(
         max_length=200, required=False, allow_blank=True, help_text="검색 키워드"
     )
-    theme = serializers.CharField(
-        max_length=100, required=False, allow_blank=True, help_text="테마 필터 (카테고리 상위 개념)"
+    mainCategory = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, help_text="메인 카테고리 필터 (기존 테마)"
     )
-    category = serializers.CharField(
-        max_length=100, required=False, allow_blank=True, help_text="카테고리 필터"
+    subCategory = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, help_text="서브 카테고리 필터 (기존 카테고리)"
     )
     tags = serializers.CharField(
         required=False, allow_blank=True, help_text="태그 필터 (쉼표로 구분)"
@@ -250,9 +230,8 @@ class SearchResultSerializer(PostDocumentSerializer):
     PostDocumentSerializer를 상속받아 검색 결과에 필요한 필드를 추가하고,
     'content' 필드는 응답에서 제외합니다.
     """
-    # content와 meta_description 필드를 부모로부터 상속받지 않도록 None으로 설정
+    # content 필드를 부모로부터 상속받지 않도록 None으로 설정
     content = None
-    meta_description = None
     
     score = serializers.FloatField(help_text="검색 관련도 점수")
     highlight = serializers.SerializerMethodField(help_text="하이라이트된 필드")
