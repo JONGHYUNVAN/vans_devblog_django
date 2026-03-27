@@ -27,6 +27,8 @@ django.setup()
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.autodoc.typehints",
     "sphinx.ext.viewcode",
     "sphinx.ext.napoleon",
 ]
@@ -39,6 +41,26 @@ autodoc_default_options = {
     "member-order": "bysource",
     "exclude-members": "__weakref__",
 }
+
+# Autosummary 설정
+autosummary_generate = True
+
+# 타입 힌트 표시 설정
+autodoc_typehints = "description"
+autodoc_typehints_description_target = "documented_params"
+
+# Napoleon (Google/Numpy docstring) 설정
+napoleon_google_docstring = True
+napoleon_numpy_docstring = True
+napoleon_include_init_with_doc = False
+napoleon_include_private_with_doc = False
+napoleon_include_special_with_doc = True
+napoleon_use_admonition_for_examples = False
+napoleon_use_admonition_for_notes = False
+napoleon_use_admonition_for_references = False
+napoleon_use_ivar = True
+napoleon_use_param = True
+napoleon_use_rtype = True
 
 # 모듈 레벨 변수 제외
 autodoc_mock_imports = []

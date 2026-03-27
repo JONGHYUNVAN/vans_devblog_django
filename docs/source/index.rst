@@ -1,7 +1,7 @@
 .. doc documentation master file, created by
    sphinx-quickstart on Sun Aug 17 20:13:49 2025.
    You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+   contain the root ``toctree`` directive.
 
 VansDevBlog Search Service
 ==========================
@@ -84,7 +84,14 @@ API Documentation
    
    quickstart
    architecture
+   configuration
+   installation
    deployment
    testing
    api
+   documents
+   serializers
+   views
+   utils
+   api_reference
 

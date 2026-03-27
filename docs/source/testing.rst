@@ -2,7 +2,7 @@ Testing
 =======
 
 테스트 실행
------------
+------
 
 .. code-block:: bash
 
@@ -19,7 +19,7 @@ Testing
    pytest --cov=search --cov-report=html
 
 테스트 종류
------------
+------
 
 Unit Tests
 ~~~~~~~~~~
@@ -43,19 +43,19 @@ Performance Tests
 ~~~~~~~~~~~~~~~~~
 
 * **목적**: 메모리 사용량, 응답 시간 등 성능 검증
-* **특징**: `@pytest.mark.timeout`, `@pytest.mark.memory_test` 사용
+* **특징**: ``@pytest.mark.timeout``, ``@pytest.mark.memory_test`` 사용
 
 테스트 구성
------------
+------
 
-* **설정**: `vans_search_service/settings/testing.py`
-* **전역 픽스처**: `tests/conftest.py`
+* **설정**: ``vans_search_service/settings/testing.py``
+* **전역 픽스처**: ``tests/conftest.py``
 * **DB**: In-memory SQLite 사용으로 빠른 테스트
-* **캐시**: `DummyCache` 사용으로 캐시 비활성화
+* **캐시**: ``DummyCache`` 사용으로 캐시 비활성화
 
 베스트 프랙티스
---------------
+--------
 
 * **AAA 패턴**: Arrange(준비), Act(실행), Assert(검증) 패턴 사용
-* **명확한 테스트 이름**: `test_search_with_empty_query_returns_empty_results` 처럼 명확하게 작성
-* **외부 의존성 모킹**: `unittest.mock.patch`를 사용하여 외부 서비스(ES, DB)를 철저히 모킹
+* **명확한 테스트 이름**: ``test_search_with_empty_query_returns_empty_results`` 처럼 명확하게 작성
+* **외부 의존성 모킹**: ``unittest.mock.patch``를 사용하여 외부 서비스(ES, DB)를 철저히 모킹

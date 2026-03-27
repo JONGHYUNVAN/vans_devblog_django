@@ -1,9 +1,10 @@
 Serializers - Data Validation
-===============================
+=============================
 
 요청/응답 데이터 검증 및 직렬화를 담당합니다.
 
-.. automodule:: search.serializers
+.. automodule:: search.api.serializers
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:

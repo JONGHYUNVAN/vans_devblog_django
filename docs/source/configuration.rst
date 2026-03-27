@@ -2,12 +2,12 @@ Configuration
 =============
 
 Django 설정
------------
+---------
 
-주요 설정들을 ``settings.py``에서 구성할 수 있습니다.
+주요 설정들은 settings.py에서 구성할 수 있습니다.
 
 Elasticsearch 설정
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -20,7 +20,7 @@ Elasticsearch 설정
     }
 
 Redis 캐시 설정
-~~~~~~~~~~~~~
+~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -36,7 +36,7 @@ Redis 캐시 설정
     }
 
 로깅 설정
---------
+-----
 
 .. code-block:: python
 
@@ -60,7 +60,7 @@ Redis 캐시 설정
     }
 
 검색 인덱스 설정
---------------
+---------
 
 인덱스 생성:
 

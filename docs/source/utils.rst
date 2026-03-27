@@ -1,28 +1,31 @@
-Utils - Helper Modules
-=======================
+Clients & Utilities
+===================
 
-내부 유틸리티 모듈들입니다.
+클라이언트 및 유틸리티 모듈입니다.
 
 Elasticsearch Client
----------------------
+--------------------
 
-.. automodule:: search.utils.elasticsearch_client
+.. automodule:: search.clients.elasticsearch_client
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 MongoDB Client
 --------------
 
-.. automodule:: search.utils.mongodb_client
+.. automodule:: search.clients.mongodb_client
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
-Cache Utils
------------
+Plain Text Utils
+----------------
 
-.. automodule:: search.utils.cache_utils
+.. automodule:: search.utils.pm_plain
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:

@@ -2,7 +2,7 @@ Architecture
 ============
 
 시스템 구조
-----------
+-----------
 
 VansDevBlog Search Service는 마이크로서비스 아키텍처를 따릅니다:
 
@@ -29,7 +29,7 @@ VansDevBlog Search Service는 마이크로서비스 아키텍처를 따릅니다
 * **API Docs**: drf-yasg (Swagger/OpenAPI)
 
 주요 컴포넌트
------------
+-------------
 
 API Layer
 ~~~~~~~~~
@@ -60,7 +60,7 @@ Data Storage
 * **Collection 기반**: 문서형 데이터 저장
 
 데이터 플로우
------------
+-------------
 
 1. **검색 요청**: 클라이언트가 API 요청
 2. **캐시 확인**: Redis에서 캐시된 결과 확인
@@ -70,7 +70,7 @@ Data Storage
 6. **응답 반환**: JSON 형태로 결과 반환
 
 폴더 구조
-----------
+---------
 
 .. code-block:: text
 

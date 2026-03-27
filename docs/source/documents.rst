@@ -1,5 +1,5 @@
 Documents - Elasticsearch Models
-==================================
+================================
 
 Elasticsearch 문서 모델 정의입니다.
 
