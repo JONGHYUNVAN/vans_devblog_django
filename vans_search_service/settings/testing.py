@@ -22,7 +22,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "rest_framework",
+    "drf_yasg",
     "search",
+    "kis",
 ]
 
 # 테스트용 간단한 URL 설정 (admin 제외)

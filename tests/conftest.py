@@ -71,8 +71,7 @@ def clean_cache():
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def sample_search_log():
+def sample_search_log(db):
     """샘플 검색 로그 데이터"""
     from search.models import SearchLog
 
@@ -82,8 +81,7 @@ def sample_search_log():
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def sample_popular_search():
+def sample_popular_search(db):
     """샘플 인기 검색어 데이터"""
     from search.models import PopularSearch
 

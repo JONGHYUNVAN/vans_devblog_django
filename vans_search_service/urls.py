@@ -67,6 +67,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # API 엔드포인트
     path("api/v1/search/", include("search.urls")),
+    path("api/kis/", include("kis.urls")),
     # Swagger 문서화
     path(
         "swagger<format>/", schema_view.without_ui(cache_timeout=0), name="schema-json"
