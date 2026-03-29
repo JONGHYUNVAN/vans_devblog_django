@@ -200,6 +200,11 @@ LOGGING = {
             "level": "WARNING",
             "propagate": False,
         },
+        "kis": {
+            "handlers": ["console", "file"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
     },
 }
 

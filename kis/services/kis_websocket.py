@@ -12,13 +12,14 @@ SSE 리스너에게 실시간 체결가/호가 데이터를 중계한다.
 """
 
 import asyncio
+import base64
 import json
 import logging
 import threading
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 import websockets
 
@@ -68,6 +69,9 @@ class KisWebSocketManager:
         # 종목별 최신 데이터 캐시
         self._trade_cache: Dict[str, dict] = {}
         self._orderbook_cache: Dict[str, dict] = {}
+
+        # TR_ID별 AES 암호화 키 (tr_id -> (iv, key))
+        self._aes_keys: Dict[str, Tuple[str, str]] = {}
 
         # SSE 리스너: symbol -> list of (event_type, data) 콜백
         self._listeners: Dict[str, List[Callable]] = defaultdict(list)
@@ -320,12 +324,34 @@ class KisWebSocketManager:
     # Internal: Message handling
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _decrypt_aes(key: str, iv: str, ciphertext_b64: str) -> str:
+        """
+        KIS WebSocket AES-256-CBC 복호화.
+
+        KIS는 구독 응답에서 받은 key(32바이트)와 iv(16바이트)로
+        실시간 데이터를 AES-256-CBC + PKCS7 패딩으로 암호화해서 전송한다.
+        """
+        from Crypto.Cipher import AES
+        from Crypto.Util.Padding import unpad
+
+        key_bytes = key.encode("utf-8")   # 32 bytes → AES-256
+        iv_bytes = iv.encode("utf-8")     # 16 bytes
+        ciphertext = base64.b64decode(ciphertext_b64)
+        cipher = AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
+        decrypted = unpad(cipher.decrypt(ciphertext), AES.block_size)
+        return decrypted.decode("utf-8")
+
     def _on_message(self, raw: str) -> None:
         """
         수신 메시지 분기 처리.
 
         JSON 제어 메시지 (구독 응답, PINGPONG)와
         파이프('|') 구분 데이터 메시지를 구분하여 처리한다.
+
+        데이터 메시지 형식: "암호화여부|tr_id|건수|데이터본문"
+          - 암호화여부 == "0": 평문
+          - 암호화여부 == "1": AES-256-CBC (구독 응답의 iv/key로 복호화)
         """
         try:
             # 1. JSON 제어 메시지 (구독 응답 또는 PINGPONG)
@@ -334,16 +360,21 @@ class KisWebSocketManager:
                 header = msg.get("header", {})
 
                 if header.get("tr_id") == "PINGPONG":
-                    # KIS PINGPONG 요청 — 동일 메시지를 그대로 반환
                     self._send_pong(raw)
                     logger.debug("PINGPONG 수신 및 응답")
                     return
 
-                # 구독 성공/실패 응답
+                # 구독 성공/실패 응답 — iv/key 수신 시 저장
                 body = msg.get("body", {})
                 output = body.get("output", {})
                 tr_id = header.get("tr_id", "")
-                logger.info("구독 응답: tr_id=%s msg=%s", tr_id, output)
+                iv = output.get("iv", "")
+                key = output.get("key", "")
+                if iv and key:
+                    self._aes_keys[tr_id] = (iv, key)
+                    logger.info("AES 키 저장: tr_id=%s", tr_id)
+                else:
+                    logger.info("구독 응답: tr_id=%s msg=%s", tr_id, output)
                 return
 
             # 2. 데이터 메시지: "암호화여부|tr_id|건수|데이터본문"
@@ -352,8 +383,21 @@ class KisWebSocketManager:
                 logger.debug("파이프 분리 필드 부족: %s", raw[:100])
                 return
 
+            encrypted_flag = parts[0]
             tr_id = parts[1]
             body = parts[3]
+
+            # 암호화된 경우 복호화
+            if encrypted_flag == "1":
+                aes = self._aes_keys.get(tr_id)
+                if aes is None:
+                    logger.warning("암호화 데이터 수신했으나 AES 키 없음: tr_id=%s", tr_id)
+                    return
+                try:
+                    body = self._decrypt_aes(aes[1], aes[0], body)
+                except Exception as exc:
+                    logger.error("AES 복호화 실패: tr_id=%s err=%s", tr_id, exc)
+                    return
 
             if tr_id == TR_ID_TRADE:
                 trade = parse_trade(body)

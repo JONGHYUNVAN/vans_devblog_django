@@ -107,19 +107,6 @@ DATABASES = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     },
-    # MariaDB connection for search logs (기존 User Service DB)
-    "search_logs": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": get_env_variable("MARIADB_DATABASE", "vans_user_db"),
-        "USER": get_env_variable("MARIADB_USER", "vans_user"),
-        "PASSWORD": get_env_variable("MARIADB_PASSWORD", "password"),
-        "HOST": get_env_variable("MARIADB_HOST", "localhost"),
-        "PORT": get_env_variable("MARIADB_PORT", "3306"),
-        "OPTIONS": {
-            "charset": "utf8mb4",
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-        },
-    },
 }
 
 # =============================================================================

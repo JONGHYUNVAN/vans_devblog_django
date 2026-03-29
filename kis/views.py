@@ -18,7 +18,18 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
+from rest_framework.renderers import BaseRenderer
 from rest_framework.response import Response
+
+
+class ServerSentEventRenderer(BaseRenderer):
+    """SSE(text/event-stream) 응답을 위한 DRF 렌더러."""
+
+    media_type = "text/event-stream"
+    format = "event-stream"
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
 
 from kis.constants import KR_STOCK_MAP
 from kis.services.kis_websocket import KisWebSocketManager
@@ -152,52 +163,7 @@ def snapshot(request, symbol: str):
 # SSE Stream View
 # ---------------------------------------------------------------------------
 
-@swagger_auto_schema(
-    method="get",
-    operation_summary="KIS 종목 실시간 SSE 스트리밍",
-    operation_description=(
-        "KIS WebSocket 체결가/호가 데이터를 Server-Sent Events(SSE)로 실시간 중계한다.\n\n"
-        "**이벤트 종류**\n"
-        "- `trade` : 체결가 데이터 (price, change, volume 등)\n"
-        "- `orderbook` : 호가 데이터 (askPrices, bidPrices, totalAskVolume 등)\n"
-        "- `ping` : 연결 유지용 30초 주기 핑\n"
-        "- `error` : 오류 발생 시 (invalid symbol 등)\n\n"
-        "**KIS 미설정 시** `ping`만 전송하는 degraded 스트림을 반환한다.\n\n"
-        "**응답 형식 예시**\n"
-        "```\n"
-        "event: trade\n"
-        "data: {\"symbol\": \"005930\", \"price\": 58300, \"change\": 200}\n\n"
-        "event: ping\n"
-        "data: {}\n\n"
-        "```"
-    ),
-    manual_parameters=[
-        openapi.Parameter(
-            "symbol",
-            openapi.IN_PATH,
-            description="KRX 종목코드 6자리 (예: 005930)",
-            type=openapi.TYPE_STRING,
-        )
-    ],
-    responses={
-        200: openapi.Response(
-            description="SSE 스트림 (Content-Type: text/event-stream)",
-            examples={
-                "text/event-stream": (
-                    "event: trade\n"
-                    "data: {\"symbol\": \"005930\", \"price\": 58300}\n\n"
-                    "event: ping\n"
-                    "data: {}\n\n"
-                )
-            },
-        ),
-        400: "유효하지 않은 종목코드",
-    },
-    produces=["text/event-stream"],
-)
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def stream(request, symbol: str):
+def stream(request, symbol):
     """
     SSE 스트리밍 뷰.
 
@@ -248,6 +214,11 @@ def stream(request, symbol: str):
 
     def event_stream():
         try:
+            # ── 즉시 connected 이벤트 전송 ──
+            # WSGI는 첫 yield 시점에 HTTP 헤더를 클라이언트에 전송하므로
+            # 반드시 첫 번째로 yield해야 연결이 열립니다.
+            yield f"event: connected\ndata: {json.dumps({'symbol': symbol})}\n\n"
+
             # 초기 스냅샷 즉시 전송
             snap = manager.get_snapshot(symbol)
             if snap:
@@ -265,8 +236,8 @@ def stream(request, symbol: str):
                 except queue.Empty:
                     pass
 
-                # 30초마다 ping
-                if time.time() - last_ping > 30:
+                # 15초마다 ping (Next.js 타임아웃 30s보다 짧게)
+                if time.time() - last_ping > 15:
                     yield "event: ping\ndata: {}\n\n"
                     last_ping = time.time()
 

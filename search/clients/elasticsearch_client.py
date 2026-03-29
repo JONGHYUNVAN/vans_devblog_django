@@ -201,7 +201,7 @@ class ElasticsearchClient:
 
             # 검색 실행 (성능 최적화)
             response = self.client.search(
-                index="vans_posts", 
+                index="posts",
                 body=body,
                 request_timeout=2,  # 2초 타임아웃
                 ignore_unavailable=True,  # 인덱스 없어도 오류 안내지 않음
@@ -279,7 +279,7 @@ class ElasticsearchClient:
                 "_source": ["title", "tags"],
             }
 
-            response = self.client.search(index="vans_posts", body=body)
+            response = self.client.search(index="posts", body=body)
 
             suggestions = set()
             for hit in response["hits"]["hits"]:

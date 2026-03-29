@@ -129,7 +129,7 @@ class PostDocument(Document):
     class Index:
         """Elasticsearch 인덱스 설정."""
 
-        name = "vans_posts"
+        name = "posts"
         settings = BASE_INDEX_SETTINGS
 
     def save(self, **kwargs) -> "PostDocument":
