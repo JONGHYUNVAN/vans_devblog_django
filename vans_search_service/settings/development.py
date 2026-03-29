@@ -69,7 +69,7 @@ ELASTICSEARCH_PASSWORD = get_env_variable("ELASTICSEARCH_PASSWORD", "VANSDEVBLOG
 es_config = {
     "hosts": [f"https://{ELASTICSEARCH_HOST}"],
     "timeout": 30,
-    "verify_certs": False,  # 개발환경에서는 SSL 인증서 검증 비활성화
+    "verify_certs": True,
     "http_auth": (ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD),
 }
 

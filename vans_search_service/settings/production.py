@@ -144,7 +144,7 @@ ELASTICSEARCH_PASSWORD = get_env_variable("ELASTICSEARCH_PASSWORD", "")
 es_config = {
     "hosts": [f"https://{ELASTICSEARCH_HOST}"],
     "timeout": 30,
-    "verify_certs": False,  # CloudType ES는 자체 서명 인증서 사용
+    "verify_certs": True,  # 운영환경에서는 SSL 인증서 검증 활성화
     "http_auth": (ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD),
 }
 
