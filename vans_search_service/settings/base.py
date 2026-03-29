@@ -245,6 +245,13 @@ MONGODB_DATABASE = get_env_variable("MONGODB_DATABASE", "")
 
 # URI 방식 (Atlas 등 mongodb+srv://) 우선, 없으면 개별 변수 방식
 if MONGODB_URI:
+    # MONGODB_DATABASE 미설정 시 URI 경로에서 자동 추출
+    # 예: mongodb+srv://user:pass@host/dbname?params → dbname
+    if not MONGODB_DATABASE:
+        from urllib.parse import urlparse
+        _parsed = urlparse(MONGODB_URI)
+        MONGODB_DATABASE = _parsed.path.lstrip("/").split("?")[0]
+
     print(f"MongoDB 설정: URI 방식 (database={MONGODB_DATABASE})")
     MONGODB_SETTINGS = {
         "uri": MONGODB_URI,
