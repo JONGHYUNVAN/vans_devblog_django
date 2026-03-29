@@ -234,14 +234,9 @@ class SearchService:
 
     def _build_sort_params(self, sort_option: str) -> List[Dict[str, Any]]:
         sort_mapping = {
-            "relevance": [
-                {"_score": {"order": "desc"}},
-                # {"published_date": {"order": "desc"}},  # published_date 제거됨
-            ],
-            # "date_desc": [{"published_date": {"order": "desc"}}],  # published_date 제거됨
-            # "date_asc": [{"published_date": {"order": "asc"}}],    # published_date 제거됨
-            "views_desc": [{"view_count": {"order": "desc"}}],
-            "likes_desc": [{"like_count": {"order": "desc"}}],
+            "relevance": [{"_score": {"order": "desc"}}],
+            "date_desc": [{"updatedAt": {"order": "desc"}}],
+            "date_asc": [{"updatedAt": {"order": "asc"}}],
         }
         return sort_mapping.get(sort_option, sort_mapping["relevance"])
 

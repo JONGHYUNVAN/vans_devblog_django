@@ -50,23 +50,21 @@ class PostDocumentSerializer(serializers.Serializer):
     Attributes:
         post_id (str): 게시물 ID
         title (str): 제목 (검색 핵심 필드)
-        content (str): 내용 (검색 핵심 필드)
-        topic (str): 게시물 주제 (검색 핵심 필드)
         description (str): 게시물 설명 (검색 필드)
+        topic (str): 게시물 주제 (검색 핵심 필드)
         mainCategory (str): 메인 카테고리 (필터링용)
         subCategory (str): 서브 카테고리 (필터링용)
         tags (List[str]): 태그 목록 (검색 + 필터링)
-        authorEmail (str): 작성자 이메일 (필터링용)
-        viewCount (int): 조회수 (정렬용만)
-        likeCount (int): 좋아요 수 (정렬용만)
+        author (str): 작성자 닉네임 (표시용)
         language (str): 언어 코드 (필터링용)
-        updated_date (datetime): 수정일 (정렬용)
+        createdAt (datetime): 생성일 (정렬용)
+        updatedAt (datetime): 수정일 (정렬용)
 
     Example:
         >>> post_data = {
         ...     "post_id": "507f1f77bcf86cd799439011",
         ...     "title": "Django Tutorial",
-        ...     "content": "Django is a web framework...",
+        ...     "description": "Django is a web framework...",
         ...     "mainCategory": "Backend",
         ...     "subCategory": "Framework",
         ...     "tags": ["Django", "Python"]
@@ -81,12 +79,11 @@ class PostDocumentSerializer(serializers.Serializer):
         max_length=100, help_text="게시물 ID (MongoDB ObjectId)"
     )
     title = serializers.CharField(max_length=200, help_text="게시물 제목")
-    content = serializers.CharField(help_text="게시물 내용")
-    topic = serializers.CharField(
-        max_length=200, allow_blank=True, required=False, help_text="게시물 주제"
-    )
     description = serializers.CharField(
         max_length=500, allow_blank=True, required=False, help_text="게시물 설명"
+    )
+    topic = serializers.CharField(
+        max_length=200, allow_blank=True, required=False, help_text="게시물 주제"
     )
 
     # 분류 필드
@@ -103,14 +100,10 @@ class PostDocumentSerializer(serializers.Serializer):
         help_text="태그 목록",
     )
 
-    # 작성자 정보
-    authorEmail = serializers.EmailField(
-        allow_blank=True, required=False, help_text="작성자 이메일"
+    # 작성자 정보 (닉네임만, PII 없음)
+    author = serializers.CharField(
+        max_length=100, allow_blank=True, required=False, help_text="작성자 닉네임"
     )
-
-    # 통계 필드
-    viewCount = serializers.IntegerField(default=0, min_value=0, help_text="조회수")
-    likeCount = serializers.IntegerField(default=0, min_value=0, help_text="좋아요 수")
 
     # 언어 코드 (필터링용)
     language = serializers.CharField(
@@ -118,7 +111,8 @@ class PostDocumentSerializer(serializers.Serializer):
     )
 
     # 날짜 필드 (정렬용)
-    updated_date = serializers.DateTimeField(required=False, help_text="수정일")
+    createdAt = serializers.DateTimeField(required=False, allow_null=True, help_text="생성일")
+    updatedAt = serializers.DateTimeField(required=False, allow_null=True, help_text="수정일")
 
 
 class SearchRequestSerializer(serializers.Serializer):
@@ -178,8 +172,6 @@ class SearchRequestSerializer(serializers.Serializer):
             ("relevance", "관련도"),
             ("date_desc", "최신순"),
             ("date_asc", "오래된순"),
-            ("views_desc", "조회수순"),
-            ("likes_desc", "좋아요순"),
         ],
         default="relevance",
         help_text="정렬 방식",
@@ -227,12 +219,8 @@ class SearchResultSerializer(PostDocumentSerializer):
     """
     검색 결과 시리얼라이저.
 
-    PostDocumentSerializer를 상속받아 검색 결과에 필요한 필드를 추가하고,
-    'content' 필드는 응답에서 제외합니다.
+    PostDocumentSerializer를 상속받아 검색 결과에 필요한 필드를 추가합니다.
     """
-    # content 필드를 부모로부터 상속받지 않도록 None으로 설정
-    content = None
-    
     score = serializers.FloatField(help_text="검색 관련도 점수")
     highlight = serializers.SerializerMethodField(help_text="하이라이트된 필드")
 

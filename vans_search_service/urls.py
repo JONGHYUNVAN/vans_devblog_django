@@ -19,6 +19,7 @@ from django.urls import include, path
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
+from search.api.views import index_post_view, delete_post_index_view
 
 # Swagger 스키마 설정
 schema_view = get_schema_view(
@@ -68,6 +69,9 @@ urlpatterns = [
     # API 엔드포인트
     path("api/v1/search/", include("search.urls")),
     path("api/kis/", include("kis.urls")),
+    # 내부 인덱싱 API (NestJS → Django 직접 호출 경로, X-Internal-Key 인증)
+    path("api/internal/search/index/", index_post_view, name="internal-index-post"),
+    path("api/internal/search/index/<str:post_id>/", delete_post_index_view, name="root-internal-delete-post"),
     # Swagger 문서화
     path(
         "swagger<format>/", schema_view.without_ui(cache_timeout=0), name="schema-json"

@@ -29,4 +29,7 @@ urlpatterns = [
     path("sync/status/", views.sync_status, name="sync-status"),
     path("sync/", views.sync_data, name="sync-data"),
     path("sync/all/", views.sync_all_data, name="sync-all-data"),
+    # 내부 인덱싱 API (NestJS → Django, X-Internal-Key 인증)
+    path("internal/index/", views.index_post_view, name="internal-index-post"),
+    path("internal/index/<str:post_id>/", views.delete_post_index_view, name="internal-delete-post"),
 ]

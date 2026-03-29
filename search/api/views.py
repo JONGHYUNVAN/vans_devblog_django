@@ -9,6 +9,7 @@ import logging
 import time
 from datetime import datetime
 
+from django.conf import settings
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
@@ -16,6 +17,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from ..documents.post_document import PostDocument, extract_tiptap_text
 from ..services.health_service import HealthService
 from ..services.search_service import SearchService
 from ..services.sync_service import SyncService
@@ -505,5 +507,125 @@ def sync_all_data(request):
                 "error": "Full sync request failed",
                 "message": "전체 데이터 동기화 중 오류가 발생했습니다. 다시 시도해주세요.",
             },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+# =============================================================================
+# INTERNAL API — NestJS 에서 직접 호출하는 실시간 인덱싱 엔드포인트
+# =============================================================================
+
+def _verify_internal_key(request) -> bool:
+    """X-Internal-Key 헤더가 settings.INTERNAL_API_KEY와 일치하는지 검증합니다."""
+    key = request.META.get('HTTP_X_INTERNAL_KEY', '')
+    return key == settings.INTERNAL_API_KEY
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def index_post_view(request):
+    """
+    NestJS에서 호출하는 내부 인덱싱 엔드포인트입니다.
+    게시물을 Elasticsearch에 upsert합니다.
+
+    Header: X-Internal-Key: <INTERNAL_API_KEY>
+
+    Body fields: post_id, title, description, content (TipTap JSON),
+                 topic, tags, mainCategory, subCategory, language,
+                 author, createdAt, updatedAt
+    """
+    if not _verify_internal_key(request):
+        logger.warning(
+            f"[InternalIndex] 인증 실패 - IP: {request.META.get('REMOTE_ADDR', 'unknown')}"
+        )
+        return Response(
+            {"error": "Authentication failed", "message": "Invalid or missing X-Internal-Key header"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    try:
+        data = request.data
+        post_id = data.get('post_id', '')
+
+        if not post_id:
+            return Response(
+                {"error": "Missing required field: post_id"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # TipTap JSON content → 순수 텍스트 추출
+        content_raw = data.get('content')
+        if isinstance(content_raw, dict):
+            texts = extract_tiptap_text(content_raw)
+            content_text = " ".join(texts)
+        elif isinstance(content_raw, str):
+            content_text = content_raw
+        else:
+            content_text = ""
+
+        # PostDocument upsert (meta.id = post_id)
+        doc = PostDocument(
+            meta={'id': post_id},
+            post_id=post_id,
+            title=data.get('title', ''),
+            description=data.get('description', ''),
+            content_text=content_text,
+            topic=data.get('topic', ''),
+            tags=data.get('tags', []),
+            mainCategory=data.get('mainCategory', ''),
+            subCategory=data.get('subCategory', ''),
+            language=data.get('language', 'ko'),
+            author=data.get('author', ''),
+            createdAt=data.get('createdAt'),
+            updatedAt=data.get('updatedAt'),
+        )
+        doc.save()
+
+        logger.info(f"[InternalIndex] 인덱싱 성공 - post_id={post_id}")
+        return Response({"status": "indexed", "post_id": post_id}, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"[InternalIndex] 인덱싱 실패: {str(e)}", exc_info=True)
+        return Response(
+            {"error": "Indexing failed", "message": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["DELETE"])
+@permission_classes([AllowAny])
+def delete_post_index_view(request, post_id: str):
+    """
+    NestJS에서 호출하는 내부 인덱스 삭제 엔드포인트입니다.
+    Elasticsearch에서 게시물 인덱스를 삭제합니다.
+
+    Header: X-Internal-Key: <INTERNAL_API_KEY>
+    """
+    if not _verify_internal_key(request):
+        logger.warning(
+            f"[InternalIndex] 인증 실패 (삭제) - IP: {request.META.get('REMOTE_ADDR', 'unknown')}"
+        )
+        return Response(
+            {"error": "Authentication failed", "message": "Invalid or missing X-Internal-Key header"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    try:
+        doc = PostDocument.get(id=post_id)
+        doc.delete()
+        logger.info(f"[InternalIndex] 인덱스 삭제 성공 - post_id={post_id}")
+        return Response({"status": "deleted", "post_id": post_id}, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        error_str = str(e).lower()
+        if 'notfounderror' in type(e).__name__.lower() or '404' in error_str or 'not found' in error_str:
+            logger.warning(f"[InternalIndex] 삭제 대상 없음 - post_id={post_id}")
+            return Response(
+                {"error": "Not found", "post_id": post_id},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        logger.error(f"[InternalIndex] 인덱스 삭제 실패 - post_id={post_id}: {str(e)}", exc_info=True)
+        return Response(
+            {"error": "Delete failed", "message": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

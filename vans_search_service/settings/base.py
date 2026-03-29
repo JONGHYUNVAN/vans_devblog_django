@@ -292,3 +292,9 @@ CACHES = {
 SEARCH_CACHE_TIMEOUT = 300  # 5분
 AUTOCOMPLETE_CACHE_TIMEOUT = 600  # 10분
 POPULAR_SEARCHES_CACHE_TIMEOUT = 60  # 1분 (준실시간)
+
+# =============================================================================
+# INTERNAL API KEY
+# =============================================================================
+
+INTERNAL_API_KEY = os.environ.get('INTERNAL_API_KEY', 'vansdevbloguserinternalapikey1234567890!')

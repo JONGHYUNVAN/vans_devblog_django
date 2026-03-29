@@ -105,7 +105,7 @@ class ElasticsearchClient:
     ) -> Dict[str, Any]:
         """
         게시물을 검색하고, Elasticsearch에 저장된 실제 데이터(_source)를 기반으로 응답을 생성합니다.
-        'content' 필드를 반드시 포함하여 반환합니다.
+        content_text 필드는 대용량이므로 _source에서 제외하고 반환합니다.
         """
         try:
             # 안전하고 빠른 검색 쿼리 (기존 필드 호환)
@@ -181,7 +181,7 @@ class ElasticsearchClient:
             body = {
                 "query": {"bool": {"must": [search_query], "filter": filter_conditions}},
                 "_source": {
-                    "excludes": ["content", "content_text"]  # 대용량 필드 제외로 속도 향상
+                    "excludes": ["content_text"]  # 대용량 본문 필드 제외로 속도 향상
                 },
                 "highlight": {
                     "pre_tags": ["<mark>"],
@@ -214,41 +214,27 @@ class ElasticsearchClient:
                 source = hit["_source"]
                 highlight = hit.get("highlight", {})
 
-                # content 필드 생성 (본문 스니펫)
-                content_snippet = ""
+                # description 스니펫 생성 (하이라이트 우선)
+                description_snippet = ""
                 if "description" in highlight:
-                    content_snippet = highlight["description"][0]
+                    description_snippet = highlight["description"][0]
                 elif source.get("description"):
-                    content_snippet = (source["description"][:150] + '...') if len(source["description"]) > 150 else source["description"]
-
-                # summary 필드 생성 (주제)
-                summary_text = source.get("topic", "")
-
-                # author 객체 생성
-                author_email = source.get("author_email")
-                author = {
-                    "user_id": author_email,
-                    "username": author_email.split('@')[0] if author_email else None,
-                    "display_name": author_email.split('@')[0] if author_email else None,
-                    "profile_image": None,
-                } if author_email else None
+                    raw_desc = source["description"]
+                    description_snippet = (raw_desc[:150] + '...') if len(raw_desc) > 150 else raw_desc
 
                 # 최종 API 응답 객체 생성
                 formatted_hit = {
                     "post_id": source.get("post_id"),
                     "title": source.get("title"),
-                    "summary": summary_text,
-                    "content": content_snippet, # content 필드 추가
-                    "theme": source.get("theme"),
-                    "category": source.get("category"),
+                    "description": description_snippet,
+                    "topic": source.get("topic"),
+                    "mainCategory": source.get("mainCategory"),
+                    "subCategory": source.get("subCategory"),
                     "tags": source.get("tags"),
-                    "author": author,
-                    "updated_date": source.get("updated_date"),
-                    "view_count": source.get("view_count"),
-                    "like_count": source.get("like_count"),
+                    "author": source.get("author"),
                     "language": source.get("language"),
-                    "reading_time": source.get("reading_time"),
-                    "featured_image": source.get("thumbnail"),
+                    "createdAt": source.get("createdAt"),
+                    "updatedAt": source.get("updatedAt"),
                     "score": hit["_score"],
                     "highlight": highlight,
                 }
