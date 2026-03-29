@@ -240,41 +240,31 @@ print(f"Elasticsearch 연결: https://{ELASTICSEARCH_HOST}")
 # MONGODB SETTINGS
 # =============================================================================
 
-# MongoDB 환경변수 로깅
-MONGODB_HOST = get_env_variable("MONGODB_HOST")
-MONGODB_PORT = get_env_variable("MONGODB_PORT", "27017")
-MONGODB_DATABASE = get_env_variable("MONGODB_DATABASE")
-MONGODB_USERNAME = get_env_variable("MONGODB_USERNAME")
-MONGODB_PASSWORD = get_env_variable("MONGODB_PASSWORD")
+MONGODB_URI = get_env_variable("MONGODB_URI", "")
+MONGODB_DATABASE = get_env_variable("MONGODB_DATABASE", "")
 
-print(f"MongoDB 설정:")
-print(f"MONGODB_HOST: {MONGODB_HOST}")
-print(f"MONGODB_PORT: {MONGODB_PORT}")
-print(f"MONGODB_DATABASE: {MONGODB_DATABASE}")
-print(f"MONGODB_USERNAME: {MONGODB_USERNAME}")
-print(f"MONGODB_PASSWORD: {'***' if MONGODB_PASSWORD else 'None'}")
-
-if not MONGODB_HOST:
-    print("MONGODB_HOST 환경변수가 설정되지 않았습니다!")
-if not MONGODB_DATABASE:
-    print("MONGODB_DATABASE 환경변수가 설정되지 않았습니다!")
-if not MONGODB_USERNAME:
-    print("MONGODB_USERNAME 환경변수가 설정되지 않았습니다!")
-if not MONGODB_PASSWORD:
-    print("MONGODB_PASSWORD 환경변수가 설정되지 않았습니다!")
-
-MONGODB_SETTINGS = {
-    "host": MONGODB_HOST,
-    "port": int(MONGODB_PORT),
-    "database": MONGODB_DATABASE,
-    "username": MONGODB_USERNAME,
-    "password": MONGODB_PASSWORD,
-    "auth_source": get_env_variable("MONGODB_AUTH_SOURCE", "admin"),
-    "direct_connection": get_env_variable("MONGODB_DIRECT_CONNECTION", "true").lower()
-    == "true",
-}
-
-print(f"MongoDB 연결: {MONGODB_HOST}:{MONGODB_PORT}/{MONGODB_DATABASE}")
+# URI 방식 (Atlas 등 mongodb+srv://) 우선, 없으면 개별 변수 방식
+if MONGODB_URI:
+    print(f"MongoDB 설정: URI 방식 (database={MONGODB_DATABASE})")
+    MONGODB_SETTINGS = {
+        "uri": MONGODB_URI,
+        "database": MONGODB_DATABASE,
+    }
+else:
+    MONGODB_HOST = get_env_variable("MONGODB_HOST", "localhost")
+    MONGODB_PORT = get_env_variable("MONGODB_PORT", "27017")
+    MONGODB_USERNAME = get_env_variable("MONGODB_USERNAME", "")
+    MONGODB_PASSWORD = get_env_variable("MONGODB_PASSWORD", "")
+    print(f"MongoDB 연결: {MONGODB_HOST}:{MONGODB_PORT}/{MONGODB_DATABASE}")
+    MONGODB_SETTINGS = {
+        "host": MONGODB_HOST,
+        "port": int(MONGODB_PORT),
+        "database": MONGODB_DATABASE,
+        "username": MONGODB_USERNAME,
+        "password": MONGODB_PASSWORD,
+        "auth_source": get_env_variable("MONGODB_AUTH_SOURCE", "admin"),
+        "direct_connection": get_env_variable("MONGODB_DIRECT_CONNECTION", "true").lower() == "true",
+    }
 
 # =============================================================================
 # CACHING SETTINGS

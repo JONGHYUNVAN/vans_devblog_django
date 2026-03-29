@@ -50,8 +50,10 @@ class MongoDBClient:
         try:
             mongodb_settings = settings.MONGODB_SETTINGS
 
-            # MongoDB 연결 URL 구성
-            if mongodb_settings.get("username") and mongodb_settings.get("password"):
+            # URI 방식 (mongodb+srv:// 등) 우선
+            if mongodb_settings.get("uri"):
+                connection_url = mongodb_settings["uri"]
+            elif mongodb_settings.get("username") and mongodb_settings.get("password"):
                 connection_url = (
                     f"mongodb://{mongodb_settings['username']}:"
                     f"{mongodb_settings['password']}@"
