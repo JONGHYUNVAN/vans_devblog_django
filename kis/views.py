@@ -214,12 +214,8 @@ def stream(request, symbol):
 
     def event_stream():
         try:
-            # ── 즉시 connected 이벤트 전송 ──
-            # WSGI는 첫 yield 시점에 HTTP 헤더를 클라이언트에 전송하므로
-            # 반드시 첫 번째로 yield해야 연결이 열립니다.
             yield f"event: connected\ndata: {json.dumps({'symbol': symbol})}\n\n"
 
-            # 초기 스냅샷 즉시 전송
             snap = manager.get_snapshot(symbol)
             if snap:
                 if snap.get("trade"):
@@ -236,7 +232,6 @@ def stream(request, symbol):
                 except queue.Empty:
                     pass
 
-                # 15초마다 ping (Next.js 타임아웃 30s보다 짧게)
                 if time.time() - last_ping > 15:
                     yield "event: ping\ndata: {}\n\n"
                     last_ping = time.time()
