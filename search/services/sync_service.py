@@ -254,10 +254,10 @@ class SyncService:
         force_all = options.get("force_all", False)
         dry_run = options.get("dry_run", False)
 
-        result = {"processed": 0, "synced": 0, "skipped": 0, "errors": 0}
+        result = {"processed": 0, "synced": 0, "skipped": 0, "errors": 0, "ghost_deleted": 0}
 
         # 게시물 가져오기 (is_published 필드가 없으므로 모든 게시물 조회)
-        posts_iterator = self.mongo_client.get_all_posts(batch_size=batch_size)
+        posts_iterator = self.mongo_client.get_all_posts()
 
         batch_posts = []
 
@@ -274,6 +274,11 @@ class SyncService:
         if batch_posts:
             batch_result = self._process_batch(batch_posts, dry_run)
             self._update_result(result, batch_result)
+
+        # 고스트 문서 삭제 (dry_run 시 건너뜀)
+        if not dry_run:
+            ghost_count = self._delete_ghost_documents()
+            result["ghost_deleted"] = ghost_count
 
         return result
 
@@ -359,3 +364,59 @@ class SyncService:
         for key in batch_result:
             if key in total_result:
                 total_result[key] += batch_result[key]
+
+    def _delete_ghost_documents(self) -> int:
+        """
+        Elasticsearch에 존재하지만 MongoDB에는 없는 고스트 문서를 삭제한다.
+
+        full sync 완료 후 호출되어 삭제된 게시물의 ES 잔존 문서를 정리한다.
+
+        Returns:
+            int: 삭제된 고스트 문서 수
+        """
+        try:
+            # 1. MongoDB의 모든 _id를 string set으로 수집
+            mongo_ids = {
+                str(doc["_id"])
+                for doc in self.mongo_client.posts_collection.find({}, {"_id": 1})
+            }
+            logger.info(f"[GhostCleanup] MongoDB 게시물 수: {len(mongo_ids)}")
+
+            # 2. ES의 모든 post_id를 scan으로 수집 (scroll API)
+            from elasticsearch_dsl import Search
+
+            es_ids = set()
+            s = (
+                Search(using=self.es_client.client, index="posts")
+                .source(["post_id"])
+            )
+            for hit in s.scan():
+                if hit.post_id:
+                    es_ids.add(hit.post_id)
+            logger.info(f"[GhostCleanup] ES 문서 수: {len(es_ids)}")
+
+            # 3. 차집합 = ES에 있지만 MongoDB에 없는 고스트
+            ghost_ids = es_ids - mongo_ids
+            if not ghost_ids:
+                logger.info("[GhostCleanup] 고스트 문서 없음")
+                return 0
+
+            logger.info(f"[GhostCleanup] 고스트 문서 {len(ghost_ids)}개 삭제 시작")
+
+            # 4. 고스트 문서 삭제
+            deleted_count = 0
+            for post_id in ghost_ids:
+                try:
+                    doc = PostDocument.get(id=post_id, using=self.es_client.client)
+                    doc.delete()
+                    deleted_count += 1
+                    logger.info(f"[GhostCleanup] 삭제 완료: {post_id}")
+                except Exception as e:
+                    logger.warning(f"[GhostCleanup] 삭제 실패 {post_id}: {e}")
+
+            logger.info(f"[GhostCleanup] 총 {deleted_count}개 고스트 문서 삭제 완료")
+            return deleted_count
+
+        except Exception as e:
+            logger.error(f"[GhostCleanup] 고스트 문서 삭제 중 오류: {str(e)}", exc_info=True)
+            return 0

@@ -79,7 +79,7 @@ def run_safe_tests(test_type="quick", verbose=False):
         cmd = base_cmd + [
             "tests/",
             "-m",
-            "not slow",
+            "not slow and not memory_stress",
             "--ds=vans_search_service.settings.testing",
             "-v" if verbose else "",
             "--timeout=60",

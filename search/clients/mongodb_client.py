@@ -168,25 +168,17 @@ class MongoDBClient:
             logger.error(f"Failed to get published posts: {str(e)}")
             return
 
-    def get_all_posts(
-        self, batch_size: int = 100, skip: int = 0
-    ) -> Iterator[Dict[str, Any]]:
+    def get_all_posts(self) -> Iterator[Dict[str, Any]]:
         """
-        모든 게시물을 배치 단위로 반환합니다 (발행 여부 무관).
-
-        Args:
-            batch_size (int): 배치 크기 (기본값: 100)
-            skip (int): 건너뛸 문서 수 (기본값: 0)
+        모든 게시물을 cursor로 반환. limit 없음.
+        categories 컬렉션 $lookup으로 mainCategory/subCategory value를 포함하여 반환한다.
 
         Yields:
-            Dict[str, Any]: 원본 게시물 문서
-
-        Example:
-            >>> for post in mongo_client.get_all_posts():
-            ...     print(f"Post: {post['title']} - Published: {post.get('is_published', False)}")
+            Dict[str, Any]: mainCategory, subCategory value가 포함된 게시물 문서
         """
         try:
-            cursor = self.posts_collection.find({}).skip(skip).limit(batch_size)
+            pipeline = self._build_category_lookup_pipeline()
+            cursor = self.posts_collection.aggregate(pipeline)
             yield from cursor
         except Exception as e:
             logger.error(f"Failed to get all posts: {str(e)}")
@@ -249,10 +241,11 @@ class MongoDBClient:
     ) -> Iterator[Dict[str, Any]]:
         """
         특정 날짜 이후 업데이트된 게시물들을 반환합니다.
+        limit 없이 전체 결과를 반환하며, batch_size는 네트워크 왕복당 가져오는 문서 수만 제어합니다.
 
         Args:
             since_date (datetime): 기준 날짜
-            batch_size (int): 배치 크기
+            batch_size (int): 네트워크 왕복당 가져오는 문서 수 (결과 총 수를 제한하지 않음)
 
         Yields:
             Dict[str, Any]: 원본 게시물 문서
@@ -266,11 +259,11 @@ class MongoDBClient:
         try:
             query = {
                 "$or": [
-                    {"updated_date": {"$gte": since_date}},
-                    {"published_date": {"$gte": since_date}},
+                    {"updatedAt": {"$gte": since_date}},
+                    {"createdAt": {"$gte": since_date}},
                 ]
             }
-            cursor = self.posts_collection.find(query).limit(batch_size)
+            cursor = self.posts_collection.find(query).batch_size(batch_size)
             yield from cursor
         except Exception as e:
             logger.error(f"Failed to get posts updated since {since_date}: {str(e)}")
@@ -327,6 +320,59 @@ class MongoDBClient:
         except Exception as e:
             logger.error(f"Failed to get tags: {str(e)}")
             return []
+
+    def _build_category_lookup_pipeline(
+        self, match_stage: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        mainCategory/subCategory value를 포함하는 aggregation pipeline을 구성한다.
+        categories 컬렉션에서 mainCategoryId, subCategoryId를 $lookup하여
+        value 필드를 mainCategory, subCategory로 매핑한다.
+
+        Args:
+            match_stage (Optional[Dict]): 파이프라인 앞에 추가할 $match 조건
+
+        Returns:
+            List[Dict]: aggregation pipeline 단계 목록
+        """
+        pipeline = []
+
+        if match_stage:
+            pipeline.append({"$match": match_stage})
+
+        pipeline.extend([
+            {
+                "$lookup": {
+                    "from": "categories",
+                    "localField": "mainCategoryId",
+                    "foreignField": "_id",
+                    "as": "_mainCat",
+                }
+            },
+            {
+                "$lookup": {
+                    "from": "categories",
+                    "localField": "subCategoryId",
+                    "foreignField": "_id",
+                    "as": "_subCat",
+                }
+            },
+            {
+                "$addFields": {
+                    "mainCategory": {
+                        "$ifNull": [{"$arrayElemAt": ["$_mainCat.value", 0]}, ""]
+                    },
+                    "subCategory": {
+                        "$ifNull": [{"$arrayElemAt": ["$_subCat.value", 0]}, ""]
+                    },
+                }
+            },
+            {
+                "$project": {"_mainCat": 0, "_subCat": 0}
+            },
+        ])
+
+        return pipeline
 
     def _build_query(self, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
